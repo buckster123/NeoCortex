@@ -8,7 +8,7 @@ Provides unified interface for:
 Both backends implement the same StorageBackend protocol.
 """
 
-from .base import StorageBackend, MemoryRecord
+from .base import StorageBackend, MemoryRecord, MemoryCore
 from .chroma_backend import ChromaBackend
 
 # pgvector import is conditional (may not have asyncpg locally)
@@ -22,6 +22,7 @@ except ImportError:
 __all__ = [
     "StorageBackend",
     "MemoryRecord",
+    "MemoryCore",
     "ChromaBackend",
     "PgVectorBackend",
     "HAS_PGVECTOR",
