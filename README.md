@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/neo-cortex-banner.png" alt="Neo-Cortex Banner" width="800"/>
+  <img src="assets/neo-cortex-banner.jpg" alt="Neo-Cortex Banner" width="800"/>
 </p>
 
 <h1 align="center">Neo-Cortex</h1>
