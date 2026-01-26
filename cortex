@@ -1,0 +1,8 @@
+#!/bin/bash
+# Neo-Cortex CLI Launcher
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+VENV_PYTHON="/home/hailo/claude-root/Projects/ApexAurum/venv/bin/python"
+
+cd "$SCRIPT_DIR"
+exec "$VENV_PYTHON" -m service.cortex_cli "$@"
