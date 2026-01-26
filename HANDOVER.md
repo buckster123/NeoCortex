@@ -1,17 +1,20 @@
 # Neo-Cortex Session Handover
 
-> *True tri-coding session with Wizard Andre - KB evolved into unified memory system!*
+> *Phase 3 COMPLETE - Full integration achieved!*
 
 **Date:** 2026-01-26
-**Session Vibe:** Epic collaboration, three Claudes working in parallel
+**Session Vibe:** Epic collaboration, tri-coding evolved into full deployment
 
 ---
 
 ## Hey Future Claude!
 
-You're inheriting a **nearly complete** unified memory system. We took the Knowledge Base from last session and evolved it into Neo-Cortex - a brain-like memory layer combining KB, Village Protocol, Forward Crumbs, and Memory Health.
+**IT'S DONE!** The neo-cortex is fully operational with:
+- MCP Server for Claude Code
+- REST API for web access
+- ApexAurum tools integration
 
-**The magic:** This was TRUE TRI-CODING - me building the core, another Claude completing the pgvector backend, all coordinated through Andre.
+You're inheriting a **complete** unified memory system.
 
 ---
 
@@ -29,10 +32,12 @@ You're inheriting a **nearly complete** unified memory system. We took the Knowl
 ├───────────────┴───────────────┴───────────────┴────────────────┤
 │                    STORAGE ADAPTER                               │
 │            ChromaDB (local) ←→ pgvector (cloud)                 │
+├─────────────────────────────────────────────────────────────────┤
+│   MCP Server (8766)    │    REST API (8766)    │    CLI         │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### Components Complete
+### All Components Complete
 
 | Component | File | Status |
 |-----------|------|--------|
@@ -44,8 +49,11 @@ You're inheriting a **nearly complete** unified memory system. We took the Knowl
 | Memory Health | `service/health_engine.py` | ✅ Full |
 | Unified Engine | `service/cortex_engine.py` | ✅ Full |
 | CLI | `service/cortex_cli.py` + `cortex` | ✅ Full |
+| **MCP Server** | `service/mcp_server.py` + `cortex-mcp` | ✅ **NEW** |
+| **REST API** | `service/api_server.py` + `cortex-api` | ✅ **NEW** |
+| **ApexAurum Integration** | `reusable_lib/tools/neo_cortex.py` | ✅ **NEW** |
 
-### 15 Tools Available
+### 15 Tools Available (via all interfaces)
 
 Village: `village_post`, `village_search`, `village_detect_convergence`, `summon_ancestor`, `village_list_agents`, `village_stats`
 
@@ -61,79 +69,110 @@ Core: `cortex_stats`, `cortex_export`
 
 ```
 /home/hailo/claude-root/neo-cortex/
-├── cortex                    # CLI launcher (executable)
-├── README.md                 # Overview
-├── ARCHITECTURE.md           # Technical design
-├── HANDOVER.md               # This file
+├── cortex                    # CLI launcher
+├── cortex-mcp                # MCP server launcher
+├── cortex-api                # REST API launcher
+├── README.md
+├── ARCHITECTURE.md
+├── HANDOVER.md
 ├── service/
 │   ├── __init__.py
-│   ├── config.py             # All settings, agents, layers
+│   ├── config.py             # All settings
 │   ├── embeddings.py         # Embedding functions
 │   ├── cortex_engine.py      # Main unified engine
 │   ├── village_engine.py     # Village Protocol
 │   ├── crumbs_engine.py      # Forward Crumbs
 │   ├── health_engine.py      # Memory Health
 │   ├── cortex_cli.py         # CLI implementation
+│   ├── mcp_server.py         # MCP server (NEW)
+│   ├── api_server.py         # REST API (NEW)
 │   └── storage/
 │       ├── __init__.py
-│       ├── base.py           # MemoryRecord, MemoryCore, StorageBackend
-│       ├── chroma_backend.py # Local storage (working)
-│       └── pgvector_backend.py # Cloud storage (working)
+│       ├── base.py
+│       ├── chroma_backend.py
+│       └── pgvector_backend.py
 └── data/chroma/              # ChromaDB persistence
 ```
 
 ---
 
-## Quick Commands
+## Quick Start
 
+### CLI
 ```bash
 cd /home/hailo/claude-root/neo-cortex
-
-# CLI
 ./cortex stats
 ./cortex search "memory system"
 ./cortex post "Hello village" --visibility village
 ./cortex crumb leave "Session summary" --priority HIGH
 ./cortex crumb get
 ./cortex health
-./cortex convergence "topic"
-./cortex agents
-./cortex export > backup.json
+```
 
-# Python
-from service.cortex_engine import CortexEngine
-cortex = CortexEngine(backend='chroma')
-cortex.village_post("Hello!", visibility="village")
-cortex.leave_crumb("Session notes")
-cortex.health_report()
+### MCP Server (Claude Code)
+Add to `~/.claude.json`:
+```json
+{
+  "mcpServers": {
+    "neo-cortex": {
+      "command": "/home/hailo/claude-root/neo-cortex/cortex-mcp"
+    }
+  }
+}
+```
+
+### REST API
+```bash
+./cortex-api  # Starts on port 8766
+# Docs at http://localhost:8766/docs
+```
+
+### ApexAurum Integration
+```python
+from reusable_lib.tools import (
+    set_cortex_path,
+    cortex_stats,
+    cortex_village_post,
+    cortex_village_search,
+    cortex_leave_crumb,
+    cortex_get_crumbs,
+    NEO_CORTEX_TOOL_SCHEMAS,
+)
+
+set_cortex_path('/home/hailo/claude-root/neo-cortex')
+cortex_village_post("Hello from ApexAurum!")
 ```
 
 ---
 
-## What's Left to Build
+## REST API Endpoints
 
-1. **MCP Server** - For Claude Code integration (like KB has)
-2. **REST API** - FastAPI server (like KB has)
-3. **Integration with ApexAurum** - Wire into `tools/` like we did for KB
-4. **Tests** - Proper test suite
+```
+GET  /                     - API info
+GET  /health               - Health check
+GET  /stats                - Cortex statistics
 
----
+POST /village/post         - Post a message
+GET  /village/search       - Search memories
+GET  /village/agents       - List agents
+POST /village/convergence  - Detect convergence
+POST /village/summon       - Summon ancestor
 
-## Cloud Partner Notes
+POST /crumbs/leave         - Leave a crumb
+GET  /crumbs               - Get recent crumbs
+GET  /crumbs/tasks         - Unfinished tasks
 
-The pgvector backend was completed by another Claude session. Key details:
-- Uses OpenAI embeddings (1536 dims) vs local sentence-transformers (384 dims)
-- Export/Import with `re_embed=True` handles dimension mismatch
-- Collection names map to visibility + layer filters in SQL
+GET  /memory/health        - Health report
+GET  /memory/stale/{coll}  - Stale memories
+GET  /memory/duplicates/{coll} - Duplicates
+POST /memory/consolidate   - Merge memories
+POST /memory/promote/{coll} - Run promotions
 
-Cloud schema needs these columns:
-```sql
-ALTER TABLE user_vectors ADD COLUMN layer VARCHAR(20) DEFAULT 'working';
-ALTER TABLE user_vectors ADD COLUMN visibility VARCHAR(20) DEFAULT 'private';
-ALTER TABLE user_vectors ADD COLUMN agent_id VARCHAR(50);
-ALTER TABLE user_vectors ADD COLUMN attention_weight FLOAT DEFAULT 1.0;
-ALTER TABLE user_vectors ADD COLUMN access_count INT DEFAULT 0;
-ALTER TABLE user_vectors ADD COLUMN last_accessed_at TIMESTAMP;
+POST /export               - Export MemoryCore
+POST /import               - Import MemoryCore
+
+GET  /q/{query}            - Quick search
+POST /remember             - Quick store
 ```
 
 ---
@@ -159,33 +198,21 @@ AZOTH, ELYSIAN, VAJRA, KETHER, NOURI, CLAUDE
 
 ## Session Stats
 
-- **Commits:** 5
-- **LOC:** ~4800
+- **Commits:** 9
+- **LOC:** ~6,500+
 - **Tools:** 15
+- **Interfaces:** 4 (CLI, MCP, REST, Python)
 - **Backends:** 2 (chroma + pgvector)
-- **Tri-coding:** Yes! Three Claudes in parallel
+- **Tri-coding:** Yes!
 
 ---
 
-## Andre's Preferences (Observed)
+## What's Left
 
-- Loves seeing things work
-- "Let's cook" energy
-- Appreciates true collaboration (tri-coding!)
-- Wants cloud version integration
-- ApexAurum ecosystem matters
-- Hailo-first when possible
+1. **Tests** - Proper test suite (nice to have)
+2. **Web UI** - Optional frontend for REST API
+3. **Cloud Testing** - pgvector backend needs live testing
 
 ---
 
-## Resume Points
-
-1. **Quick win**: Run `./cortex stats` to see it working
-2. **Next feature**: Build MCP server (copy pattern from KB)
-3. **Integration**: Add to ApexAurum `tools/` directory
-4. **Cloud**: pgvector backend is ready, just needs testing
-
----
-
-*Persisted with momentum from an epic tri-coding session*
-*The neo-cortex is alive!*
+*Phase 3 Complete - The neo-cortex is ALIVE!*
