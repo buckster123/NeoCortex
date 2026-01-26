@@ -1,0 +1,15 @@
+#!/bin/bash
+# Neo-Cortex MCP Server launcher
+# Usage: ./cortex-mcp
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+VENV_PYTHON="/home/hailo/claude-root/Projects/ApexAurum/venv/bin/python"
+
+# Check if venv exists
+if [ ! -f "$VENV_PYTHON" ]; then
+    echo "Error: Python venv not found at $VENV_PYTHON" >&2
+    exit 1
+fi
+
+cd "$SCRIPT_DIR"
+exec "$VENV_PYTHON" -m service.mcp_server "$@"
