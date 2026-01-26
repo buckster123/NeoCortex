@@ -32,6 +32,7 @@ from .storage import ChromaBackend, StorageBackend, MemoryRecord, MemoryCore
 from .storage.chroma_backend import export_to_memory_core, import_from_memory_core
 from .village_engine import VillageEngine, VILLAGE_TOOL_SCHEMAS
 from .crumbs_engine import CrumbsEngine, CRUMBS_TOOL_SCHEMAS
+from .health_engine import HealthEngine, HEALTH_TOOL_SCHEMAS
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +80,7 @@ class CortexEngine:
         # Initialize subsystems
         self.village = VillageEngine(self.storage)
         self.crumbs = CrumbsEngine(self.storage)
+        self.health = HealthEngine(self.storage)
 
         # Shared state
         self._current_agent_id = "CLAUDE"
@@ -164,6 +166,34 @@ class CortexEngine:
     def get_unfinished_tasks(self) -> List[str]:
         """Get unfinished tasks from recent crumbs."""
         return self.crumbs.get_unfinished_tasks()
+
+    # =========================================================================
+    # Memory Health (delegated)
+    # =========================================================================
+
+    def health_report(self, **kwargs) -> Dict[str, Any]:
+        """Generate memory health report (see health_engine.health_report)."""
+        return self.health.health_report(**kwargs)
+
+    def get_stale_memories(self, collection: str, **kwargs) -> Dict[str, Any]:
+        """Get stale memories (see health_engine.get_stale_memories)."""
+        return self.health.get_stale_memories(collection, **kwargs)
+
+    def get_duplicate_candidates(self, collection: str, **kwargs) -> Dict[str, Any]:
+        """Get duplicate candidates (see health_engine.get_duplicate_candidates)."""
+        return self.health.get_duplicate_candidates(collection, **kwargs)
+
+    def consolidate_memories(self, collection: str, id1: str, id2: str, **kwargs) -> Dict[str, Any]:
+        """Consolidate memories (see health_engine.consolidate_memories)."""
+        return self.health.consolidate_memories(collection, id1, id2, **kwargs)
+
+    def run_promotions(self, collection: str, **kwargs) -> Dict[str, Any]:
+        """Run layer promotions (see health_engine.run_promotions)."""
+        return self.health.run_promotions(collection, **kwargs)
+
+    def update_attention_weights(self, collection: str, **kwargs) -> Dict[str, Any]:
+        """Update attention weights (see health_engine.update_attention_weights)."""
+        return self.health.update_attention_weights(collection, **kwargs)
 
     # =========================================================================
     # Direct Storage Operations (for knowledge and advanced use)
@@ -388,6 +418,7 @@ def stats() -> Dict:
 CORTEX_TOOL_SCHEMAS = {
     **VILLAGE_TOOL_SCHEMAS,
     **CRUMBS_TOOL_SCHEMAS,
+    **HEALTH_TOOL_SCHEMAS,
     "cortex_stats": {
         "name": "cortex_stats",
         "description": "Get comprehensive statistics about the neo-cortex memory system.",
