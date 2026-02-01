@@ -3,13 +3,26 @@
 # Usage: ./cortex-api
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-VENV_PYTHON="/home/hailo/claude-root/Projects/ApexAurum/venv/bin/python"
 
-# Check if venv exists
-if [ ! -f "$VENV_PYTHON" ]; then
-    echo "Error: Python venv not found at $VENV_PYTHON" >&2
+# Find Python in priority order:
+# 1. CORTEX_PYTHON env var (explicit override)
+# 2. Local venv in neo-cortex directory
+# 3. Active virtual environment
+# 4. System python3
+if [ -n "$CORTEX_PYTHON" ] && [ -f "$CORTEX_PYTHON" ]; then
+    PYTHON="$CORTEX_PYTHON"
+elif [ -f "$SCRIPT_DIR/venv/bin/python" ]; then
+    PYTHON="$SCRIPT_DIR/venv/bin/python"
+elif [ -n "$VIRTUAL_ENV" ] && [ -f "$VIRTUAL_ENV/bin/python" ]; then
+    PYTHON="$VIRTUAL_ENV/bin/python"
+else
+    PYTHON="$(command -v python3 || command -v python)"
+fi
+
+if [ -z "$PYTHON" ]; then
+    echo "Error: No Python found. Create a venv in $SCRIPT_DIR or set CORTEX_PYTHON." >&2
     exit 1
 fi
 
 cd "$SCRIPT_DIR"
-exec "$VENV_PYTHON" -m service.api_server "$@"
+exec "$PYTHON" -m service.api_server "$@"

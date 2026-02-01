@@ -10,7 +10,7 @@
 # Check if already running
 curl -s http://localhost:8766/health 2>/dev/null || (
   cd /home/hailo/claude-root/neo-cortex &&
-  /home/hailo/claude-root/Projects/ApexAurum/venv/bin/python -m uvicorn service.api_server:app --host 0.0.0.0 --port 8766 --log-level warning &
+  ./cortex-api &
   disown && sleep 5
 )
 ```
@@ -118,7 +118,6 @@ When the neo-cortex MCP server is configured in `~/.claude.json`, these tools ar
 
 ## Development Notes
 
-- Python venv: `/home/hailo/claude-root/Projects/ApexAurum/venv/bin/python`
 - Embeddings: sentence-transformers `all-MiniLM-L6-v2` (384-dim, CPU)
 - Running on Raspberry Pi 5 - embedding operations can be slow, avoid bulk operations
 - ChromaDB data persists at `data/chroma/` - never delete unless intentional

@@ -21,7 +21,7 @@ The neo-cortex MCP server must be configured in `~/.claude.json`. Verify it exis
 {
   "mcpServers": {
     "neo-cortex": {
-      "command": "/home/hailo/claude-root/neo-cortex/cortex-mcp"
+      "command": "/path/to/neo-cortex/cortex-mcp"
     }
   }
 }
@@ -41,8 +41,7 @@ On every session start:
 1. **Start the neo-cortex API** (if you need the dashboard or REST endpoints):
    ```bash
    curl -s http://localhost:8766/health 2>/dev/null || (
-     cd /home/hailo/claude-root/neo-cortex &&
-     /home/hailo/claude-root/Projects/ApexAurum/venv/bin/python -m uvicorn service.api_server:app --host 0.0.0.0 --port 8766 --log-level warning &
+     cd /path/to/neo-cortex && ./cortex-api &
      disown && sleep 5
    )
    ```
@@ -137,8 +136,7 @@ On every session start:
 1. Start neo-cortex API if needed:
    ```bash
    curl -s http://localhost:8766/health 2>/dev/null || (
-     cd /home/hailo/claude-root/neo-cortex &&
-     /home/hailo/claude-root/Projects/ApexAurum/venv/bin/python -m uvicorn service.api_server:app --host 0.0.0.0 --port 8766 --log-level warning &
+     cd /path/to/neo-cortex && ./cortex-api &
      disown && sleep 5
    )
    ```
@@ -159,6 +157,5 @@ Call `mcp__neo-cortex__session_save` with summary, discoveries, and unfinished b
 
 ---
 
-**Location:** `/home/hailo/claude-root/neo-cortex/INTEGRATE.md`
-**Neo-Cortex repo:** `/home/hailo/claude-root/neo-cortex/`
+**Neo-Cortex repo:** https://github.com/buckster123/NeoCortex
 **Dashboard:** http://localhost:8766/ui
