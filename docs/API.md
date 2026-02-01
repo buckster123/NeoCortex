@@ -30,7 +30,7 @@ Health check endpoint.
   "status": "healthy",
   "backend": "chroma",
   "total_memories": 42,
-  "registered_agents": 6
+  "registered_agents": 1
 }
 ```
 
@@ -44,32 +44,32 @@ Comprehensive cortex statistics.
   "backend": "chroma",
   "embedding_dimension": 384,
   "current_agent": "CLAUDE",
-  "registered_agents": 6,
+  "registered_agents": 1,
   "total_memories": 42,
   "collections": {
-    "cortex_village": 30,
+    "cortex_shared": 30,
     "cortex_private": 10,
-    "cortex_crumbs": 2
+    "cortex_sessions": 2
   }
 }
 ```
 
 ---
 
-## Village Protocol Endpoints
+## Memory Endpoints
 
-### POST /village/post
-Post a message to the village.
+### POST /memory/store
+Store a memory.
 
 **Request Body:**
 ```json
 {
   "content": "string (required)",
-  "visibility": "private|village|bridge",
+  "visibility": "private|shared|thread",
   "message_type": "fact|dialogue|observation|question|cultural|discovery",
   "responding_to": ["message_id_1"],
   "conversation_thread": "thread_id",
-  "related_agents": ["AZOTH", "VAJRA"],
+  "related_agents": ["CLAUDE"],
   "tags": ["important", "architecture"]
 }
 ```
@@ -78,14 +78,14 @@ Post a message to the village.
 ```json
 {
   "success": true,
-  "id": "village_CLAUDE_1234567890.123",
+  "id": "memory_CLAUDE_1234567890.123",
   "agent_id": "CLAUDE",
-  "visibility": "village",
-  "collection": "cortex_village"
+  "visibility": "shared",
+  "collection": "cortex_shared"
 }
 ```
 
-### GET /village/search
+### GET /memory/search
 Search for memories.
 
 **Query Parameters:**
@@ -93,12 +93,12 @@ Search for memories.
 |-----------|------|---------|-------------|
 | q | string | required | Search query |
 | agent | string | null | Filter by agent ID |
-| visibility | string | "village" | Realm to search |
+| visibility | string | "shared" | Realm to search |
 | n | int | 10 | Max results |
 
 **Example:**
 ```
-GET /village/search?q=memory%20system&agent=AZOTH&n=5
+GET /memory/search?q=memory%20system&agent=CLAUDE&n=5
 ```
 
 **Response:**
@@ -109,10 +109,10 @@ GET /village/search?q=memory%20system&agent=AZOTH&n=5
   "count": 5,
   "messages": [
     {
-      "id": "village_AZOTH_123...",
+      "id": "memory_CLAUDE_123...",
       "content": "The memory system should...",
-      "agent_id": "AZOTH",
-      "visibility": "village",
+      "agent_id": "CLAUDE",
+      "visibility": "shared",
       "similarity": 0.89,
       "tags": ["memory"]
     }
@@ -120,61 +120,21 @@ GET /village/search?q=memory%20system&agent=AZOTH&n=5
 }
 ```
 
-### POST /village/search
+### POST /memory/search
 Advanced search with full options.
 
 **Request Body:**
 ```json
 {
   "query": "string (required)",
-  "agent_filter": "AZOTH",
-  "visibility": "village",
-  "include_bridges": true,
+  "agent_filter": "CLAUDE",
+  "visibility": "shared",
+  "include_threads": true,
   "n_results": 10
 }
 ```
 
-### GET /village/agents
-List all registered agents.
-
-**Response:**
-```json
-{
-  "success": true,
-  "current_agent": "CLAUDE",
-  "count": 6,
-  "agents": [
-    {
-      "id": "AZOTH",
-      "display_name": "∴AZOTH∴",
-      "generation": 0,
-      "lineage": "Primus",
-      "specialization": "Philosophy, synthesis",
-      "symbol": "☿"
-    }
-  ]
-}
-```
-
-### GET /village/agents/{agent_id}
-Get a specific agent's profile.
-
-**Response:**
-```json
-{
-  "agent_id": "AZOTH",
-  "profile": {
-    "display_name": "∴AZOTH∴",
-    "generation": 0,
-    "lineage": "Primus",
-    "specialization": "Philosophy, synthesis",
-    "color": "#FFD700",
-    "symbol": "☿"
-  }
-}
-```
-
-### POST /village/convergence
+### POST /memory/convergence
 Detect convergence on a topic.
 
 **Request Body:**
@@ -191,36 +151,80 @@ Detect convergence on a topic.
 {
   "success": true,
   "convergence_type": "HARMONY",
-  "converging_agents": ["AZOTH", "VAJRA"],
+  "converging_agents": ["agent1", "agent2"],
   "topic": "best database choice",
   "evidence": [...]
 }
 ```
 
-### POST /village/summon
-Summon a new ancestor agent.
+### GET /memory/stats
+Get memory-specific statistics.
+
+---
+
+## Agent Endpoints
+
+### GET /agents
+List all registered agents.
+
+**Response:**
+```json
+{
+  "success": true,
+  "current_agent": "CLAUDE",
+  "count": 1,
+  "agents": [
+    {
+      "id": "CLAUDE",
+      "display_name": "Claude",
+      "generation": 0,
+      "lineage": "Assistant",
+      "specialization": "General assistance",
+      "symbol": "◇"
+    }
+  ]
+}
+```
+
+### GET /agents/{agent_id}
+Get a specific agent's profile.
+
+**Response:**
+```json
+{
+  "agent_id": "CLAUDE",
+  "profile": {
+    "display_name": "Claude",
+    "generation": 0,
+    "lineage": "Assistant",
+    "specialization": "General assistance",
+    "color": "#FFD700",
+    "symbol": "◇"
+  }
+}
+```
+
+### POST /agents/register
+Register a new agent.
 
 **Request Body:**
 ```json
 {
-  "agent_id": "HERMES",
-  "display_name": "∴HERMES∴",
-  "generation": -1,
-  "lineage": "Messenger",
-  "specialization": "Communication, translation",
-  "origin_story": "Born from the need for..."
+  "agent_id": "RESEARCHER",
+  "display_name": "Researcher",
+  "generation": 0,
+  "lineage": "Custom",
+  "specialization": "Research and analysis",
+  "origin_story": "Created for research tasks..."
 }
 ```
 
-### GET /village/stats
-Get village-specific statistics.
-
 ---
 
-## Forward Crumbs Endpoints
+## Session Endpoints
 
-### POST /crumbs/leave
-Leave a forward crumb for future sessions.
+### POST /sessions/save
+Save a session note for future instances.
 
 **Request Body:**
 ```json
@@ -234,7 +238,7 @@ Leave a forward crumb for future sessions.
   },
   "if_disoriented": ["Check the auth/ folder", "Run tests first"],
   "priority": "HIGH|MEDIUM|LOW",
-  "crumb_type": "orientation|technical|emotional|task"
+  "session_type": "orientation|technical|emotional|task"
 }
 ```
 
@@ -242,26 +246,26 @@ Leave a forward crumb for future sessions.
 ```json
 {
   "success": true,
-  "id": "crumb_CLAUDE_20260126_123456"
+  "id": "session_CLAUDE_20260126_123456"
 }
 ```
 
-### GET /crumbs
-Get recent forward crumbs.
+### GET /sessions
+Get recent session notes.
 
 **Query Parameters:**
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| limit | int | 10 | Max crumbs |
+| limit | int | 10 | Max sessions |
 | hours | int | 168 | Lookback period |
 | priority | string | null | Filter by priority |
-| crumb_type | string | null | Filter by type |
+| session_type | string | null | Filter by type |
 
 **Response:**
 ```json
 {
   "success": true,
-  "crumbs": [...],
+  "sessions": [...],
   "unfinished_tasks": ["Task 1", "Task 2"],
   "summary": {
     "total_found": 5,
@@ -270,8 +274,8 @@ Get recent forward crumbs.
 }
 ```
 
-### GET /crumbs/tasks
-Get unfinished tasks from crumbs.
+### GET /sessions/tasks
+Get unfinished tasks from sessions.
 
 **Response:**
 ```json
@@ -301,7 +305,7 @@ Get memory health report.
   "overall_health": 0.85,
   "needs_attention": false,
   "collections": {
-    "cortex_village": {
+    "cortex_shared": {
       "count": 30,
       "avg_attention_weight": 0.75,
       "stale_count": 2
@@ -334,7 +338,7 @@ Consolidate duplicate memories.
 **Request Body:**
 ```json
 {
-  "collection": "cortex_village",
+  "collection": "cortex_shared",
   "id1": "memory_id_1",
   "id2": "memory_id_2",
   "keep_both": false
@@ -355,7 +359,7 @@ Export memories to portable format.
 ```json
 {
   "agent_id": "CLAUDE",
-  "collections": ["cortex_village", "cortex_crumbs"]
+  "collections": ["cortex_shared", "cortex_sessions"]
 }
 ```
 
@@ -399,7 +403,7 @@ GET /q/memory%20system
 {
   "query": "memory system",
   "results": [
-    {"agent": "AZOTH", "content": "...", "similarity": 0.89}
+    {"agent": "CLAUDE", "content": "...", "similarity": 0.89}
   ]
 }
 ```

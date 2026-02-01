@@ -27,7 +27,7 @@ class MemoryRecord:
 
     # Core metadata
     agent_id: str = "CLAUDE"
-    visibility: str = "private"  # private/village/bridge
+    visibility: str = "private"  # private/shared/thread
     layer: str = "working"       # sensory/working/long_term/cortex
     message_type: str = "observation"
 

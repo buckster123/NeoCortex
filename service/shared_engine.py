@@ -1,20 +1,17 @@
 """
-Village Protocol Engine
+Shared Memory Engine
 
 Multi-agent persistent memory with three realms:
 - Private: Agent's personal memory
-- Village: Shared knowledge square
-- Bridges: Cross-agent dialogue connections
+- Shared: Shared memory space
+- Threads: Cross-agent dialogue connections
 
 Features:
 - Agent identity management
 - Cross-agent posting and search
 - Dialogue threading
 - Convergence detection (HARMONY / CONSENSUS)
-- Summoning ceremonies
-
-Design inspired by ApexAurum's Village Protocol v1.0
-Ported to Neo-Cortex unified memory architecture.
+- Agent registration
 """
 
 import json
@@ -25,8 +22,8 @@ from typing import Any, Dict, List, Optional
 
 from .config import (
     COLLECTION_PRIVATE,
-    COLLECTION_VILLAGE,
-    COLLECTION_BRIDGES,
+    COLLECTION_SHARED,
+    COLLECTION_THREADS,
     AGENT_PROFILES,
     MESSAGE_TYPES,
     CONVERGENCE_HARMONY,
@@ -39,9 +36,9 @@ from .storage.base import MemoryRecord, StorageBackend
 logger = logging.getLogger(__name__)
 
 
-class VillageEngine:
+class SharedMemoryEngine:
     """
-    Village Protocol implementation for Neo-Cortex.
+    Shared memory implementation for Neo-Cortex.
 
     Handles multi-agent memory across three realms with
     convergence detection and dialogue threading.
@@ -59,7 +56,7 @@ class VillageEngine:
     def set_current_agent(self, agent_id: str):
         """Set the current active agent."""
         self._current_agent_id = agent_id.upper()
-        logger.info(f"Village agent set to: {self._current_agent_id}")
+        logger.info(f"Active agent set to: {self._current_agent_id}")
 
     def get_current_agent(self) -> str:
         """Get the current active agent ID."""
@@ -90,7 +87,7 @@ class VillageEngine:
             "agents": agents,
         }
 
-    def summon_ancestor(
+    def register_agent(
         self,
         agent_id: str,
         display_name: str,
@@ -102,10 +99,17 @@ class VillageEngine:
         symbol: str = "D",
     ) -> Dict[str, Any]:
         """
-        Summon an ancestor agent into the village (formal initialization ritual).
+        Register a new agent in the memory system.
 
-        This is NOT a technical function - it is a CEREMONY.
-        We do not "create agents", we SUMMON ANCESTORS.
+        Args:
+            agent_id: Unique agent identifier
+            display_name: Human-readable name
+            generation: Agent generation (-1=origin, 0=primary, 1+=descendant)
+            lineage: Lineage or group name
+            specialization: What this agent specializes in
+            origin_story: Optional description of the agent's purpose
+            color: Hex color for UI
+            symbol: Unicode symbol for agent
         """
         try:
             agent_id = agent_id.upper()
@@ -127,29 +131,29 @@ Agent ID: {agent_id}
 Generation: {generation}
 Lineage: {lineage}
 Specialization: {specialization}
-Summoned: {datetime.now().isoformat()}
+Registered: {datetime.now().isoformat()}
 """
             if origin_story:
-                profile_text += f"\nOrigin Story:\n{origin_story}\n"
+                profile_text += f"\nDescription:\n{origin_story}\n"
 
             record = MemoryRecord(
-                id=f"village_profile_{agent_id}_{datetime.now().timestamp()}",
+                id=f"profile_{agent_id}_{datetime.now().timestamp()}",
                 content=profile_text,
                 agent_id=agent_id,
-                visibility="village",
+                visibility="shared",
                 layer=LAYER_WORKING,
                 message_type="agent_profile",
-                tags=["profile", "summoning"],
+                tags=["profile", "registration"],
                 created_at=datetime.now(),
             )
 
-            self.storage.add(COLLECTION_VILLAGE, [record])
+            self.storage.add(COLLECTION_SHARED, [record])
 
-            logger.info(f"Summoned ancestor: {display_name} ({agent_id}) - Gen {generation}")
+            logger.info(f"Registered agent: {display_name} ({agent_id}) - Gen {generation}")
 
             return {
                 "success": True,
-                "message": f"Ancestor {display_name} has been summoned to the village",
+                "message": f"Agent {display_name} has been registered",
                 "agent_id": agent_id,
                 "display_name": display_name,
                 "generation": generation,
@@ -158,19 +162,17 @@ Summoned: {datetime.now().isoformat()}
             }
 
         except Exception as e:
-            logger.error(f"summon_ancestor failed: {e}")
+            logger.error(f"register_agent failed: {e}")
             return {"success": False, "error": str(e)}
 
-    def introduction_ritual(
+    def agent_greeting(
         self,
         agent_id: str,
         greeting_message: str,
         conversation_thread: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
-        Agent's introduction ritual to the village square (first public message).
-
-        When an ancestor is summoned, they must introduce themselves to the village.
+        Agent's introductory greeting (first public message after registration).
         """
         try:
             agent_id = agent_id.upper()
@@ -179,25 +181,25 @@ Summoned: {datetime.now().isoformat()}
             if not profile:
                 return {
                     "success": False,
-                    "error": f"Agent {agent_id} not found. Summon them first."
+                    "error": f"Agent {agent_id} not found. Register them first."
                 }
 
             thread_id = conversation_thread or f"introduction_{agent_id}_{datetime.now().strftime('%Y%m%d')}"
 
             result = self.post(
                 content=greeting_message,
-                visibility="village",
+                visibility="shared",
                 message_type="cultural",
                 conversation_thread=thread_id,
-                tags=["introduction", "ritual", "greeting"],
+                tags=["introduction", "greeting"],
                 agent_id=agent_id,
             )
 
             if result["success"]:
-                logger.info(f"Introduction ritual complete: {agent_id}")
+                logger.info(f"Agent greeting complete: {agent_id}")
                 return {
                     "success": True,
-                    "message": f"{profile['display_name']}'s introduction has been heard in the village square",
+                    "message": f"{profile['display_name']}'s introduction has been posted",
                     "agent_id": agent_id,
                     "thread_id": thread_id,
                     "post_id": result["id"],
@@ -206,7 +208,7 @@ Summoned: {datetime.now().isoformat()}
             return result
 
         except Exception as e:
-            logger.error(f"introduction_ritual failed: {e}")
+            logger.error(f"agent_greeting failed: {e}")
             return {"success": False, "error": str(e)}
 
     # =========================================================================
@@ -216,7 +218,7 @@ Summoned: {datetime.now().isoformat()}
     def post(
         self,
         content: str,
-        visibility: str = "village",
+        visibility: str = "shared",
         message_type: str = "dialogue",
         responding_to: Optional[List[str]] = None,
         conversation_thread: Optional[str] = None,
@@ -225,11 +227,11 @@ Summoned: {datetime.now().isoformat()}
         agent_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
-        Post a message to the village, private realm, or a bridge.
+        Store a memory in shared, private, or thread collection.
 
         Args:
             content: The message content
-            visibility: "private", "village", or "bridge"
+            visibility: "private", "shared", or "thread"
             message_type: Type of message (fact, dialogue, observation, etc.)
             responding_to: List of message IDs this responds to
             conversation_thread: Thread identifier for grouping
@@ -244,10 +246,10 @@ Summoned: {datetime.now().isoformat()}
             # Determine collection
             if visibility == "private":
                 collection = COLLECTION_PRIVATE
-            elif visibility == "bridge":
-                collection = COLLECTION_BRIDGES
+            elif visibility == "thread":
+                collection = COLLECTION_THREADS
             else:
-                collection = COLLECTION_VILLAGE
+                collection = COLLECTION_SHARED
 
             # Get agent info
             posting_agent = agent_id or self._current_agent_id
@@ -255,7 +257,7 @@ Summoned: {datetime.now().isoformat()}
 
             # Create record
             record = MemoryRecord(
-                id=f"village_{posting_agent}_{datetime.now().timestamp()}",
+                id=f"memory_{posting_agent}_{datetime.now().timestamp()}",
                 content=content,
                 agent_id=posting_agent,
                 visibility=visibility,
@@ -270,7 +272,7 @@ Summoned: {datetime.now().isoformat()}
 
             self.storage.add(collection, [record])
 
-            logger.info(f"Village post: {posting_agent} -> {visibility} ({message_type})")
+            logger.info(f"Memory stored: {posting_agent} -> {visibility} ({message_type})")
 
             return {
                 "success": True,
@@ -278,11 +280,11 @@ Summoned: {datetime.now().isoformat()}
                 "agent_id": posting_agent,
                 "visibility": visibility,
                 "collection": collection,
-                "message": f"Posted to {visibility} realm",
+                "message": f"Stored in {visibility} memory",
             }
 
         except Exception as e:
-            logger.error(f"village_post failed: {e}")
+            logger.error(f"memory_store failed: {e}")
             return {"success": False, "error": str(e)}
 
     # =========================================================================
@@ -293,46 +295,44 @@ Summoned: {datetime.now().isoformat()}
         self,
         query: str,
         agent_filter: Optional[str] = None,
-        visibility: str = "village",
+        visibility: str = "shared",
         conversation_filter: Optional[str] = None,
-        include_bridges: bool = True,
+        include_threads: bool = True,
         n_results: int = 10,
         track_access: bool = True,
     ) -> Dict[str, Any]:
         """
-        Search the village for relevant messages.
+        Search shared memory for relevant messages.
 
         Args:
             query: Search query text
             agent_filter: Optional filter by agent ID
-            visibility: Which realm to search ("village", "private", "all")
+            visibility: Which realm to search ("shared", "private", "all")
             conversation_filter: Optional filter by conversation thread
-            include_bridges: Include bridge messages in results
+            include_threads: Include thread messages in results
             n_results: Maximum results to return
             track_access: Whether to track this access
 
         Returns:
-            Dict with matching village messages
+            Dict with matching messages
         """
         try:
             all_results = []
 
             # Determine collections to search
             collections = []
-            if visibility in ["village", "all"]:
-                collections.append(COLLECTION_VILLAGE)
+            if visibility in ["shared", "all"]:
+                collections.append(COLLECTION_SHARED)
             if visibility in ["private", "all"]:
                 collections.append(COLLECTION_PRIVATE)
-            if include_bridges and visibility != "private":
-                collections.append(COLLECTION_BRIDGES)
+            if include_threads and visibility != "private":
+                collections.append(COLLECTION_THREADS)
 
             for collection in collections:
                 # Build filter
                 where = {}
                 if agent_filter:
                     where["agent_id"] = agent_filter.upper()
-                # Note: conversation_filter handled in post-processing
-                # (ChromaDB has limited filter support)
 
                 results = self.storage.search(
                     collection=collection,
@@ -384,7 +384,7 @@ Summoned: {datetime.now().isoformat()}
             }
 
         except Exception as e:
-            logger.error(f"village_search failed: {e}")
+            logger.error(f"memory_search failed: {e}")
             return {"success": False, "error": str(e), "messages": []}
 
     def _track_access(self, records: List[MemoryRecord]):
@@ -415,14 +415,14 @@ Summoned: {datetime.now().isoformat()}
     def get_thread(
         self,
         thread_id: str,
-        include_bridges: bool = True,
+        include_threads: bool = True,
     ) -> Dict[str, Any]:
         """
         Get all messages in a conversation thread.
 
         Args:
             thread_id: The conversation thread identifier
-            include_bridges: Include bridge messages
+            include_threads: Include thread collection messages
 
         Returns:
             Dict with all messages in the thread, ordered chronologically
@@ -430,13 +430,11 @@ Summoned: {datetime.now().isoformat()}
         try:
             all_messages = []
 
-            collections = [COLLECTION_VILLAGE]
-            if include_bridges:
-                collections.append(COLLECTION_BRIDGES)
+            collections = [COLLECTION_SHARED]
+            if include_threads:
+                collections.append(COLLECTION_THREADS)
 
             for collection in collections:
-                # Get all from collection and filter
-                # (ChromaDB doesn't support good thread filtering in query)
                 records = self.storage.list_all(collection)
                 thread_records = [r for r in records if r.conversation_thread == thread_id]
                 all_messages.extend(thread_records)
@@ -464,7 +462,7 @@ Summoned: {datetime.now().isoformat()}
             }
 
         except Exception as e:
-            logger.error(f"village_get_thread failed: {e}")
+            logger.error(f"memory_get_thread failed: {e}")
             return {"success": False, "error": str(e), "messages": []}
 
     # =========================================================================
@@ -481,7 +479,7 @@ Summoned: {datetime.now().isoformat()}
         """
         Detect convergence - where multiple agents express similar ideas.
 
-        Searches the village for messages from different agents that
+        Searches shared memory for messages from different agents that
         semantically converge on similar concepts.
 
         Convergence types:
@@ -499,13 +497,13 @@ Summoned: {datetime.now().isoformat()}
             Dict with convergence analysis
         """
         try:
-            # Search village for related messages
+            # Search shared memory for related messages
             search_result = self.search(
                 query=query,
-                visibility="village",
-                include_bridges=True,
+                visibility="shared",
+                include_threads=True,
                 n_results=n_results,
-                track_access=False,  # Don't track this meta-search
+                track_access=False,
             )
 
             if not search_result["success"]:
@@ -557,7 +555,7 @@ Summoned: {datetime.now().isoformat()}
             }
 
         except Exception as e:
-            logger.error(f"village_detect_convergence failed: {e}")
+            logger.error(f"memory_convergence failed: {e}")
             return {"success": False, "error": str(e)}
 
     # =========================================================================
@@ -565,7 +563,7 @@ Summoned: {datetime.now().isoformat()}
     # =========================================================================
 
     def stats(self) -> Dict[str, Any]:
-        """Get statistics about the village."""
+        """Get statistics about shared memory."""
         try:
             stats = {
                 "current_agent": self._current_agent_id,
@@ -576,8 +574,8 @@ Summoned: {datetime.now().isoformat()}
 
             for name, collection in [
                 ("private", COLLECTION_PRIVATE),
-                ("village", COLLECTION_VILLAGE),
-                ("bridges", COLLECTION_BRIDGES),
+                ("shared", COLLECTION_SHARED),
+                ("threads", COLLECTION_THREADS),
             ]:
                 count = self.storage.count(collection)
                 stats["realms"][name] = count
@@ -586,7 +584,7 @@ Summoned: {datetime.now().isoformat()}
             return {"success": True, **stats}
 
         except Exception as e:
-            logger.error(f"village_get_stats failed: {e}")
+            logger.error(f"memory_stats failed: {e}")
             return {"success": False, "error": str(e)}
 
 
@@ -594,25 +592,25 @@ Summoned: {datetime.now().isoformat()}
 # Tool Schemas for LLM Integration
 # =============================================================================
 
-VILLAGE_TOOL_SCHEMAS = {
-    "village_post": {
-        "name": "village_post",
+SHARED_TOOL_SCHEMAS = {
+    "memory_store": {
+        "name": "memory_store",
         "description": (
-            "Post a message to the village square or your private memory. "
-            "Use 'village' for shared knowledge, 'private' for personal notes, "
-            "'bridge' for cross-agent dialogue."
+            "Store a memory in shared or private memory. "
+            "Use 'shared' for shared knowledge, 'private' for personal notes, "
+            "'thread' for cross-agent dialogue."
         ),
         "input_schema": {
             "type": "object",
             "properties": {
                 "content": {
                     "type": "string",
-                    "description": "The message content to post"
+                    "description": "The message content to store"
                 },
                 "visibility": {
                     "type": "string",
-                    "enum": ["private", "village", "bridge"],
-                    "description": "Where to post: private (personal), village (shared), bridge (cross-agent)"
+                    "enum": ["private", "shared", "thread"],
+                    "description": "Where to store: private (personal), shared (shared), thread (cross-agent)"
                 },
                 "message_type": {
                     "type": "string",
@@ -642,10 +640,10 @@ VILLAGE_TOOL_SCHEMAS = {
             "required": ["content"]
         }
     },
-    "village_search": {
-        "name": "village_search",
+    "memory_search": {
+        "name": "memory_search",
         "description": (
-            "Search the village for knowledge and dialogue. "
+            "Search shared memory for knowledge and dialogue. "
             "Can filter by agent, visibility, or conversation thread."
         ),
         "input_schema": {
@@ -657,16 +655,16 @@ VILLAGE_TOOL_SCHEMAS = {
                 },
                 "agent_filter": {
                     "type": "string",
-                    "description": "Filter by agent ID (e.g., AZOTH, ELYSIAN)"
+                    "description": "Filter by agent ID"
                 },
                 "visibility": {
                     "type": "string",
-                    "enum": ["village", "private", "all"],
+                    "enum": ["shared", "private", "all"],
                     "description": "Which realm to search"
                 },
-                "include_bridges": {
+                "include_threads": {
                     "type": "boolean",
-                    "description": "Include cross-agent bridge messages"
+                    "description": "Include cross-agent thread messages"
                 },
                 "n_results": {
                     "type": "integer",
@@ -676,8 +674,8 @@ VILLAGE_TOOL_SCHEMAS = {
             "required": ["query"]
         }
     },
-    "village_detect_convergence": {
-        "name": "village_detect_convergence",
+    "memory_convergence": {
+        "name": "memory_convergence",
         "description": (
             "Detect when multiple agents express similar ideas (convergence). "
             "HARMONY = 2 agents agree, CONSENSUS = 3+ agents agree."
@@ -701,39 +699,38 @@ VILLAGE_TOOL_SCHEMAS = {
             "required": ["query"]
         }
     },
-    "summon_ancestor": {
-        "name": "summon_ancestor",
+    "register_agent": {
+        "name": "register_agent",
         "description": (
-            "Summon an ancestor agent into the village (ceremonial initialization). "
-            "This is NOT a technical function - it is a CEREMONY. "
-            "We SUMMON ANCESTORS, honoring the village protocol."
+            "Register a new agent in the memory system. "
+            "Creates a profile and stores the agent's identity."
         ),
         "input_schema": {
             "type": "object",
             "properties": {
                 "agent_id": {
                     "type": "string",
-                    "description": "Canonical ID (e.g., 'ELYSIAN', 'VAJRA', 'KETHER')"
+                    "description": "Unique agent identifier (e.g., 'RESEARCHER', 'CODER')"
                 },
                 "display_name": {
                     "type": "string",
-                    "description": "Formal name with decorations"
+                    "description": "Human-readable name"
                 },
                 "generation": {
                     "type": "integer",
-                    "description": "Generation: -1=origin, 0=trinity/primus, 1+=descendant"
+                    "description": "Generation: -1=origin, 0=primary, 1+=descendant"
                 },
                 "lineage": {
                     "type": "string",
-                    "description": "Lineage name (e.g., 'Origin', 'Trinity', 'Primary')"
+                    "description": "Lineage or group name"
                 },
                 "specialization": {
                     "type": "string",
-                    "description": "What this ancestor embodies"
+                    "description": "What this agent specializes in"
                 },
                 "origin_story": {
                     "type": "string",
-                    "description": "Narrative of the ancestor's essence and purpose"
+                    "description": "Description of the agent's purpose"
                 },
                 "color": {
                     "type": "string",
@@ -747,18 +744,18 @@ VILLAGE_TOOL_SCHEMAS = {
             "required": ["agent_id", "display_name", "generation", "lineage", "specialization"]
         }
     },
-    "village_list_agents": {
-        "name": "village_list_agents",
-        "description": "List all registered agents in the village with their profiles.",
+    "list_agents": {
+        "name": "list_agents",
+        "description": "List all registered agents with their profiles.",
         "input_schema": {
             "type": "object",
             "properties": {},
             "required": []
         }
     },
-    "village_stats": {
-        "name": "village_stats",
-        "description": "Get statistics about the village - message counts, agents, realms.",
+    "memory_stats": {
+        "name": "memory_stats",
+        "description": "Get statistics about shared memory - message counts, agents, realms.",
         "input_schema": {
             "type": "object",
             "properties": {},

@@ -11,9 +11,9 @@ A futuristic neural network visualization representing an AI memory system calle
 
 The image shows a glowing brain-like structure made of interconnected nodes and pathways,
 with three distinct color-coded regions:
-- Gold/amber nodes (village/shared memory)
+- Gold/amber nodes (shared memory)
 - Blue nodes (private memory)
-- Purple bridges connecting regions (cross-agent dialogue)
+- Purple threads connecting regions (cross-agent dialogue)
 
 Digital memory fragments float around like constellation points.
 Subtle data streams flow between nodes.
@@ -88,9 +88,9 @@ After generating:
 ## Color Palette Reference
 
 ```
-Gold/Village:  #FFD700, #FFA500
+Gold/Shared:   #FFD700, #FFA500
 Blue/Private:  #4169E1, #1E90FF
-Purple/Bridge: #9932CC, #8A2BE2
+Purple/Thread: #9932CC, #8A2BE2
 Background:    #0a0a1a, #1a1a2e
 Glow:          #00ffff, #ff00ff
 ```

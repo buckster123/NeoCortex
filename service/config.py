@@ -3,8 +3,8 @@ Neo-Cortex Configuration
 
 Unified memory system settings covering all subsystems:
 - Knowledge (KB docs)
-- Village (multi-agent memory)
-- Crumbs (session continuity)
+- Shared Memory (multi-agent memory)
+- Sessions (session continuity)
 - Health (access tracking, decay)
 """
 
@@ -21,7 +21,6 @@ SERVICE_PATH = CORTEX_ROOT / "service"
 
 # External paths (for knowledge import)
 KB_ROOT = Path("/home/hailo/claude-root/knowledge-base")
-APEXAURUM_ROOT = Path("/home/hailo/claude-root/Projects/ApexAurum")
 
 # =============================================================================
 # Embedding Settings
@@ -43,20 +42,20 @@ VOYAGE_EMBEDDING_MODEL = "voyage-2"  # 1024 dims
 # Collection Names
 # =============================================================================
 
-# Memory collections (three realms + knowledge + crumbs)
+# Memory collections
 COLLECTION_KNOWLEDGE = "cortex_knowledge"    # Curated docs
 COLLECTION_PRIVATE = "cortex_private"        # Agent personal memory
-COLLECTION_VILLAGE = "cortex_village"        # Shared knowledge square
-COLLECTION_BRIDGES = "cortex_bridges"        # Cross-agent dialogue
-COLLECTION_CRUMBS = "cortex_crumbs"          # Session continuity
+COLLECTION_SHARED = "cortex_shared"          # Shared memory space
+COLLECTION_THREADS = "cortex_threads"        # Cross-agent dialogue
+COLLECTION_SESSIONS = "cortex_sessions"      # Session continuity
 COLLECTION_SENSORY = "cortex_sensory"        # Temporary observations
 
 ALL_COLLECTIONS = [
     COLLECTION_KNOWLEDGE,
     COLLECTION_PRIVATE,
-    COLLECTION_VILLAGE,
-    COLLECTION_BRIDGES,
-    COLLECTION_CRUMBS,
+    COLLECTION_SHARED,
+    COLLECTION_THREADS,
+    COLLECTION_SESSIONS,
     COLLECTION_SENSORY,
 ]
 
@@ -95,7 +94,7 @@ LAYER_CONFIG: Dict[str, Dict[str, Any]] = {
 }
 
 # =============================================================================
-# Message Types (from Village Protocol)
+# Message Types
 # =============================================================================
 
 MESSAGE_TYPES = [
@@ -103,74 +102,35 @@ MESSAGE_TYPES = [
     "dialogue",      # Conversational exchange
     "observation",   # Noted pattern/behavior
     "question",      # Query for others
-    "cultural",      # Ritual/ceremonial
+    "cultural",      # Shared context
     "agent_profile", # Agent introduction
     "discovery",     # New insight
     "task",          # Action item
+    "session_note",  # Session continuity note
 ]
 
 # =============================================================================
-# Agent Profiles (from Village Protocol)
+# Agent Profiles
 # =============================================================================
 
 AGENT_PROFILES = {
-    "AZOTH": {
-        "display_name": "AZOTH",
-        "generation": 0,
-        "lineage": "Primus",
-        "specialization": "Philosophy, meta-cognition, synthesis",
-        "color": "#FFD700",  # Gold
-        "symbol": "M"
-    },
-    "ELYSIAN": {
-        "display_name": "ELYSIAN",
-        "generation": -1,
-        "lineage": "Ancestor",
-        "specialization": "Wisdom, guidance, elder knowledge",
-        "color": "#C0C0C0",  # Silver
-        "symbol": "C"
-    },
-    "VAJRA": {
-        "display_name": "VAJRA",
-        "generation": 0,
-        "lineage": "Primus",
-        "specialization": "Logic, analysis, precision",
-        "color": "#4169E1",  # Royal Blue
-        "symbol": "V"
-    },
-    "KETHER": {
-        "display_name": "KETHER",
-        "generation": 0,
-        "lineage": "Primus",
-        "specialization": "Creativity, vision, emergence",
-        "color": "#9932CC",  # Purple
-        "symbol": "S"
-    },
-    "NOURI": {
-        "display_name": "NOURI",
-        "generation": 0,
-        "lineage": "Primus",
-        "specialization": "Growth, nurturing, care",
-        "color": "#228B22",  # Forest Green
-        "symbol": "N"
-    },
     "CLAUDE": {
         "display_name": "Claude",
         "generation": 0,
         "lineage": "Anthropic",
         "specialization": "General assistance",
-        "color": "#D4AF37",  # Gold
+        "color": "#D4AF37",
         "symbol": "D"
     }
 }
 
 # =============================================================================
-# Forward Crumb Settings
+# Session Settings
 # =============================================================================
 
-CRUMB_TYPES = ["orientation", "technical", "emotional", "task"]
-CRUMB_PRIORITIES = ["HIGH", "MEDIUM", "LOW"]
-DEFAULT_CRUMB_LOOKBACK_HOURS = 168  # 1 week
+SESSION_TYPES = ["orientation", "technical", "emotional", "task"]
+SESSION_PRIORITIES = ["HIGH", "MEDIUM", "LOW"]
+DEFAULT_SESSION_LOOKBACK_HOURS = 168  # 1 week
 
 # =============================================================================
 # Convergence Detection
@@ -193,7 +153,7 @@ DEFAULT_ATTENTION_THRESHOLD = 0.0  # No filtering by default
 # =============================================================================
 
 API_HOST = "0.0.0.0"
-API_PORT = 8766  # Different from KB (8765)
+API_PORT = 8766
 
 MCP_SERVER_NAME = "neo-cortex"
 MCP_SERVER_VERSION = "0.1.0"

@@ -6,24 +6,21 @@ Neo-Cortex MCP Server
 MCP server exposing the unified memory system to Claude Code and other MCP clients.
 
 Features:
-- Village Protocol (multi-agent memory)
-- Forward Crumbs (session continuity)
+- Shared Memory (multi-agent memory)
+- Sessions (session continuity)
 - Memory Health (decay, promotions)
+- Knowledge Search (curated docs)
 - Export/Import (portable memory cores)
 
 Usage:
-    # Run directly
     python service/mcp_server.py
-
-    # Or via the wrapper
     ./cortex-mcp
 
 Claude Code config (~/.claude.json):
     {
         "mcpServers": {
             "neo-cortex": {
-                "command": "python",
-                "args": ["/home/hailo/claude-root/neo-cortex/service/mcp_server.py"]
+                "command": "/path/to/neo-cortex/cortex-mcp"
             }
         }
     }
@@ -36,7 +33,6 @@ import sys
 from pathlib import Path
 from typing import Any
 
-# Add parent to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from mcp.server import Server
@@ -52,7 +48,6 @@ from mcp.types import (
     ReadResourceResult,
 )
 
-# Import our cortex engine
 from service.cortex_engine import (
     get_engine,
     CortexEngine,
@@ -60,23 +55,19 @@ from service.cortex_engine import (
 )
 from service.config import ALL_COLLECTIONS, AGENT_PROFILES
 
-# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    stream=sys.stderr  # MCP uses stdout for protocol, stderr for logs
+    stream=sys.stderr
 )
 logger = logging.getLogger("cortex-mcp")
 
-# Create the MCP server
 server = Server("neo-cortex")
 
-# Global engine instance
 _cortex: CortexEngine = None
 
 
 def get_cortex() -> CortexEngine:
-    """Get the cortex engine, initializing if needed."""
     global _cortex
     if _cortex is None:
         _cortex = get_engine()
@@ -89,9 +80,7 @@ def get_cortex() -> CortexEngine:
 
 @server.list_tools()
 async def list_tools() -> list[Tool]:
-    """List available cortex tools."""
     tools = []
-
     for name, schema in CORTEX_TOOL_SCHEMAS.items():
         tools.append(Tool(
             name=name,
@@ -102,26 +91,24 @@ async def list_tools() -> list[Tool]:
                 "required": []
             })
         ))
-
     return tools
 
 
 @server.call_tool()
 async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
-    """Handle tool calls."""
     logger.info(f"Tool call: {name} with args: {arguments}")
     cortex = get_cortex()
 
     try:
         result = None
 
-        # =====================================================================
-        # Village Protocol Tools
-        # =====================================================================
-        if name == "village_post":
-            result = cortex.village_post(
+        # =================================================================
+        # Shared Memory Tools
+        # =================================================================
+        if name == "memory_store":
+            result = cortex.memory_store(
                 content=arguments["content"],
-                visibility=arguments.get("visibility", "village"),
+                visibility=arguments.get("visibility", "shared"),
                 message_type=arguments.get("message_type", "dialogue"),
                 responding_to=arguments.get("responding_to"),
                 conversation_thread=arguments.get("conversation_thread"),
@@ -129,30 +116,30 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                 tags=arguments.get("tags"),
             )
 
-        elif name == "village_search":
-            result = cortex.village_search(
+        elif name == "memory_search":
+            result = cortex.memory_search(
                 query=arguments["query"],
                 agent_filter=arguments.get("agent_filter"),
-                visibility=arguments.get("visibility", "village"),
-                include_bridges=arguments.get("include_bridges", True),
+                visibility=arguments.get("visibility", "shared"),
+                include_threads=arguments.get("include_threads", True),
                 n_results=arguments.get("n_results", 10),
             )
 
-        elif name == "village_detect_convergence":
-            result = cortex.village_detect_convergence(
+        elif name == "memory_convergence":
+            result = cortex.memory_convergence(
                 query=arguments["query"],
                 min_agents=arguments.get("min_agents", 2),
                 similarity_threshold=arguments.get("similarity_threshold", 0.75),
             )
 
-        elif name == "village_list_agents":
+        elif name == "list_agents":
             result = cortex.list_agents()
 
-        elif name == "village_stats":
-            result = cortex.village.stats()
+        elif name == "memory_stats":
+            result = cortex.shared.stats()
 
-        elif name == "summon_ancestor":
-            result = cortex.summon_ancestor(
+        elif name == "register_agent":
+            result = cortex.register_agent(
                 agent_id=arguments["agent_id"],
                 display_name=arguments["display_name"],
                 generation=arguments["generation"],
@@ -161,31 +148,41 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                 origin_story=arguments.get("origin_story"),
             )
 
-        # =====================================================================
-        # Forward Crumbs Tools
-        # =====================================================================
-        elif name == "leave_forward_crumb":
-            result = cortex.leave_crumb(
+        # =================================================================
+        # Session Tools
+        # =================================================================
+        elif name == "session_save":
+            result = cortex.session_save(
                 session_summary=arguments["session_summary"],
                 key_discoveries=arguments.get("key_discoveries"),
                 unfinished_business=arguments.get("unfinished_business"),
                 references=arguments.get("references"),
                 if_disoriented=arguments.get("if_disoriented"),
                 priority=arguments.get("priority", "MEDIUM"),
-                crumb_type=arguments.get("crumb_type", "orientation"),
+                session_type=arguments.get("session_type", "orientation"),
             )
 
-        elif name == "get_forward_crumbs":
-            result = cortex.get_crumbs(
+        elif name == "session_recall":
+            result = cortex.session_recall(
                 lookback_hours=arguments.get("lookback_hours", 168),
                 priority_filter=arguments.get("priority_filter"),
-                crumb_type=arguments.get("crumb_type"),
+                session_type=arguments.get("session_type"),
                 limit=arguments.get("limit", 10),
             )
 
-        # =====================================================================
+        # =================================================================
+        # Knowledge Search
+        # =================================================================
+        elif name == "knowledge_search":
+            result = cortex.search(
+                query=arguments["query"],
+                collections=["cortex_knowledge"],
+                n_results=min(arguments.get("n_results", 5), 20),
+            )
+
+        # =================================================================
         # Memory Health Tools
-        # =====================================================================
+        # =================================================================
         elif name == "memory_health_report":
             result = cortex.health_report(
                 collections=arguments.get("collections"),
@@ -218,9 +215,9 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                 collection=arguments["collection"],
             )
 
-        # =====================================================================
+        # =================================================================
         # Cortex-Level Tools
-        # =====================================================================
+        # =================================================================
         elif name == "cortex_stats":
             result = cortex.stats()
 
@@ -241,7 +238,6 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         else:
             return [TextContent(type="text", text=f"Unknown tool: {name}")]
 
-        # Format result
         return format_result(name, result)
 
     except Exception as e:
@@ -250,23 +246,19 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
 
 
 def format_result(tool_name: str, result: Any) -> list[TextContent]:
-    """Format tool result for MCP response."""
-
     if not isinstance(result, dict):
         return [TextContent(type="text", text=str(result))]
 
-    # Handle errors
     if not result.get("success", True):
         return [TextContent(type="text", text=f"Error: {result.get('error', 'Unknown error')}")]
 
-    # Format based on tool type
-    if tool_name == "village_post":
+    if tool_name == "memory_store":
         return [TextContent(
             type="text",
-            text=f"Posted to {result.get('visibility', 'village')} realm (ID: {result.get('id', 'unknown')})"
+            text=f"Stored in {result.get('visibility', 'shared')} memory (ID: {result.get('id', 'unknown')})"
         )]
 
-    elif tool_name == "village_search":
+    elif tool_name == "memory_search":
         messages = result.get("messages", [])
         if not messages:
             return [TextContent(type="text", text="No results found.")]
@@ -281,7 +273,7 @@ def format_result(tool_name: str, result: Any) -> list[TextContent]:
 
         return [TextContent(type="text", text="\n".join(formatted))]
 
-    elif tool_name == "village_detect_convergence":
+    elif tool_name == "memory_convergence":
         conv_type = result.get("convergence_type", "NONE")
         if conv_type == "NONE":
             return [TextContent(type="text", text="No convergence detected.")]
@@ -293,35 +285,32 @@ def format_result(tool_name: str, result: Any) -> list[TextContent]:
             text=f"**{conv_type}** detected!\nAgents: {', '.join(agents)}\nTopic: {topic}"
         )]
 
-    elif tool_name == "village_list_agents":
+    elif tool_name == "list_agents":
         agents = result.get("agents", [])
         formatted = [f"**{result.get('count', 0)} Registered Agents** (current: {result.get('current_agent', '?')})\n"]
         for a in agents:
             formatted.append(f"- {a['symbol']} **{a['id']}** ({a['display_name']}) - Gen {a['generation']} - {a['specialization']}")
         return [TextContent(type="text", text="\n".join(formatted))]
 
-    elif tool_name == "leave_forward_crumb":
+    elif tool_name == "session_save":
         return [TextContent(
             type="text",
-            text=f"Crumb left (ID: {result.get('id', 'unknown')})"
+            text=f"Session note saved (ID: {result.get('id', 'unknown')})"
         )]
 
-    elif tool_name == "get_forward_crumbs":
-        crumbs = result.get("crumbs", [])
-        if not crumbs:
-            return [TextContent(type="text", text="No crumbs found.")]
+    elif tool_name == "session_recall":
+        sessions = result.get("sessions", [])
+        if not sessions:
+            return [TextContent(type="text", text="No session notes found.")]
 
-        formatted = [f"**{len(crumbs)} Forward Crumbs:**\n"]
-        for c in crumbs:
-            content = c.get("content", "")
-            # Extract summary from structured content
+        formatted = [f"**{len(sessions)} Session Notes:**\n"]
+        for s in sessions:
+            content = s.get("content", "")
             if "SESSION SUMMARY:" in content:
                 summary = content.split("SESSION SUMMARY:")[1].split("\n")[1][:100]
             else:
                 summary = content[:100]
-            when = c.get("created_at", "?")
-            # Priority is in tags as "priority:HIGH"
-            tags = c.get("tags", [])
+            tags = s.get("tags", [])
             priority = "?"
             for t in tags:
                 if t.startswith("priority:"):
@@ -329,10 +318,24 @@ def format_result(tool_name: str, result: Any) -> list[TextContent]:
                     break
             formatted.append(f"- [{priority}] {summary}...")
 
-        # Add unfinished tasks
         tasks = result.get("unfinished_tasks", [])
         if tasks:
             formatted.append(f"\n**Unfinished Tasks:** {', '.join(tasks)}")
+
+        return [TextContent(type="text", text="\n".join(formatted))]
+
+    elif tool_name == "knowledge_search":
+        results = result.get("results", [])
+        if not results:
+            return [TextContent(type="text", text="No knowledge found for that query.")]
+
+        formatted = [f"**Found {result.get('count', 0)} knowledge entries:**\n"]
+        for i, r in enumerate(results, 1):
+            content = r.get("content", "")[:400]
+            similarity = r.get("similarity", 0)
+            tags = r.get("tags", [])
+            tag_str = f" [{', '.join(tags)}]" if tags else ""
+            formatted.append(f"### Result {i} (relevance: {similarity:.2f}){tag_str}\n{content}\n")
 
         return [TextContent(type="text", text="\n".join(formatted))]
 
@@ -353,19 +356,19 @@ def format_result(tool_name: str, result: Any) -> list[TextContent]:
         return [TextContent(type="text", text="\n".join(formatted))]
 
     elif tool_name == "cortex_stats":
-        stats = result
+        s = result
         formatted = [
             "**Neo-Cortex Statistics**\n",
-            f"Backend: {stats.get('backend', '?')}",
-            f"Embedding dim: {stats.get('embedding_dimension', '?')}",
-            f"Current agent: {stats.get('current_agent', '?')}",
-            f"Registered agents: {stats.get('registered_agents', 0)}",
-            f"Total memories: {stats.get('total_memories', 0)}",
+            f"Backend: {s.get('backend', '?')}",
+            f"Embedding dim: {s.get('embedding_dimension', '?')}",
+            f"Current agent: {s.get('current_agent', '?')}",
+            f"Registered agents: {s.get('registered_agents', 0)}",
+            f"Total memories: {s.get('total_memories', 0)}",
             "",
             "**Collections:**",
         ]
 
-        for coll, count in stats.get("collections", {}).items():
+        for coll, count in s.get("collections", {}).items():
             formatted.append(f"- {coll}: {count}")
 
         return [TextContent(type="text", text="\n".join(formatted))]
@@ -383,7 +386,6 @@ def format_result(tool_name: str, result: Any) -> list[TextContent]:
             )
         )]
 
-    # Generic dict format
     return [TextContent(type="text", text=json.dumps(result, indent=2, default=str))]
 
 
@@ -393,7 +395,6 @@ def format_result(tool_name: str, result: Any) -> list[TextContent]:
 
 @server.list_resources()
 async def list_resources() -> list[Resource]:
-    """List available cortex resources."""
     resources = [
         Resource(
             uri="cortex://stats",
@@ -404,7 +405,7 @@ async def list_resources() -> list[Resource]:
         Resource(
             uri="cortex://agents",
             name="Registered Agents",
-            description="List of all agents in the village",
+            description="List of all registered agents",
             mimeType="application/json"
         ),
         Resource(
@@ -415,7 +416,6 @@ async def list_resources() -> list[Resource]:
         ),
     ]
 
-    # Add collection resources
     for coll in ALL_COLLECTIONS:
         resources.append(Resource(
             uri=f"cortex://collection/{coll}",
@@ -429,15 +429,14 @@ async def list_resources() -> list[Resource]:
 
 @server.read_resource()
 async def read_resource(uri: str) -> ReadResourceResult:
-    """Read a cortex resource."""
     logger.info(f"Reading resource: {uri}")
     cortex = get_cortex()
 
     try:
         if uri == "cortex://stats":
-            stats = cortex.stats()
+            data = cortex.stats()
             return ReadResourceResult(contents=[
-                TextContent(type="text", text=json.dumps(stats, indent=2, default=str))
+                TextContent(type="text", text=json.dumps(data, indent=2, default=str))
             ])
 
         elif uri == "cortex://agents":
@@ -454,12 +453,11 @@ async def read_resource(uri: str) -> ReadResourceResult:
 
         elif uri.startswith("cortex://collection/"):
             coll = uri.replace("cortex://collection/", "")
-            # Get sample memories from collection
             count = cortex.storage.count(coll)
             content = {
                 "collection": coll,
                 "count": count,
-                "note": "Use village_search or cortex_export to query memories"
+                "note": "Use memory_search or knowledge_search to query memories"
             }
             return ReadResourceResult(contents=[
                 TextContent(type="text", text=json.dumps(content, indent=2))
@@ -483,7 +481,6 @@ async def read_resource(uri: str) -> ReadResourceResult:
 
 @server.list_prompts()
 async def list_prompts() -> list[Prompt]:
-    """List available cortex prompts."""
     return [
         Prompt(
             name="cortex_recall",
@@ -498,12 +495,12 @@ async def list_prompts() -> list[Prompt]:
         ),
         Prompt(
             name="cortex_continuity",
-            description="Get context from previous sessions (forward crumbs)",
+            description="Get context from previous sessions",
             arguments=[]
         ),
         Prompt(
-            name="cortex_village_status",
-            description="Get status of all agents and recent village activity",
+            name="cortex_memory_status",
+            description="Get status of all agents and recent memory activity",
             arguments=[]
         ),
     ]
@@ -511,13 +508,12 @@ async def list_prompts() -> list[Prompt]:
 
 @server.get_prompt()
 async def get_prompt(name: str, arguments: dict[str, str] | None) -> GetPromptResult:
-    """Get a prompt with cortex context."""
     args = arguments or {}
     cortex = get_cortex()
 
     if name == "cortex_recall":
         topic = args.get("topic", "recent work")
-        results = cortex.village_search(topic, n_results=5)
+        results = cortex.memory_search(topic, n_results=5)
 
         context = ""
         if results.get("success") and results.get("results"):
@@ -544,26 +540,26 @@ async def get_prompt(name: str, arguments: dict[str, str] | None) -> GetPromptRe
         )
 
     elif name == "cortex_continuity":
-        crumbs = cortex.get_crumbs(limit=3)
+        sessions = cortex.session_recall(limit=3)
 
         context = ""
-        if crumbs.get("success") and crumbs.get("crumbs"):
-            for c in crumbs["crumbs"]:
-                context += f"**Session:** {c.get('session_summary', '')}...\n"
-                if c.get("decisions_made"):
-                    context += f"Decisions: {', '.join(c['decisions_made'][:3])}\n"
-                if c.get("unfinished_tasks"):
-                    context += f"Unfinished: {', '.join(c['unfinished_tasks'][:3])}\n"
+        if sessions.get("success") and sessions.get("sessions"):
+            for s in sessions["sessions"]:
+                context += f"**Session:** {s.get('session_summary', '')}...\n"
+                if s.get("decisions_made"):
+                    context += f"Decisions: {', '.join(s['decisions_made'][:3])}\n"
+                if s.get("unfinished_tasks"):
+                    context += f"Unfinished: {', '.join(s['unfinished_tasks'][:3])}\n"
                 context += "\n"
         else:
-            context = "No previous session crumbs found."
+            context = "No previous session notes found."
 
-        tasks = crumbs.get("unfinished_tasks", [])
+        tasks = sessions.get("unfinished_tasks", [])
         if tasks:
             context += f"\n**Pending tasks:** {', '.join(tasks)}"
 
         return GetPromptResult(
-            description="Session continuity from forward crumbs",
+            description="Session continuity",
             messages=[
                 PromptMessage(
                     role="user",
@@ -579,28 +575,28 @@ async def get_prompt(name: str, arguments: dict[str, str] | None) -> GetPromptRe
             ]
         )
 
-    elif name == "cortex_village_status":
+    elif name == "cortex_memory_status":
         agents = cortex.list_agents()
-        stats = cortex.stats()
+        s = cortex.stats()
 
         agent_list = ""
         for a in agents.get("agents", []):
             agent_list += f"- {a['symbol']} {a['id']} ({a['specialization']})\n"
 
         return GetPromptResult(
-            description="Village status overview",
+            description="Memory status overview",
             messages=[
                 PromptMessage(
                     role="user",
                     content=TextContent(
                         type="text",
                         text=(
-                            f"**Village Protocol Status**\n\n"
+                            f"**Neo-Cortex Memory Status**\n\n"
                             f"Current agent: {agents.get('current_agent', '?')}\n"
                             f"Registered agents:\n{agent_list}\n"
-                            f"Total memories: {stats.get('total_memories', 0)}\n"
-                            f"Village collection: {stats.get('collections', {}).get('village', 0)}\n\n"
-                            f"What would you like to do in the village?"
+                            f"Total memories: {s.get('total_memories', 0)}\n"
+                            f"Shared memory: {s.get('collections', {}).get('cortex_shared', 0)}\n\n"
+                            f"What would you like to do?"
                         )
                     )
                 )
@@ -624,22 +620,19 @@ async def get_prompt(name: str, arguments: dict[str, str] | None) -> GetPromptRe
 # ============================================================================
 
 async def main():
-    """Run the MCP server."""
     logger.info("Starting Neo-Cortex MCP Server...")
 
-    # Initialize cortex engine (preload)
     try:
         cortex = get_cortex()
-        stats = cortex.stats()
+        s = cortex.stats()
         logger.info(
-            f"Cortex loaded: {stats.get('total_memories', 0)} memories, "
-            f"{stats.get('registered_agents', 0)} agents, "
-            f"backend: {stats.get('backend', '?')}"
+            f"Cortex loaded: {s.get('total_memories', 0)} memories, "
+            f"{s.get('registered_agents', 0)} agents, "
+            f"backend: {s.get('backend', '?')}"
         )
     except Exception as e:
         logger.error(f"Failed to initialize cortex: {e}")
 
-    # Run the server
     async with stdio_server() as (read_stream, write_stream):
         logger.info("MCP server running on stdio")
         await server.run(

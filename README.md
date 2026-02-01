@@ -60,8 +60,8 @@ AI agents forget everything between sessions. They can't share knowledge with ot
 ┌─────────────────────────────────────────────────────────────────┐
 │                         NEO-CORTEX                               │
 ├───────────────┬───────────────┬───────────────┬────────────────┤
-│   VILLAGE     │   FORWARD     │   MEMORY      │    UNIFIED     │
-│   PROTOCOL    │   CRUMBS      │   HEALTH      │    STORAGE     │
+│   SHARED      │   SESSION     │   MEMORY      │    UNIFIED     │
+│   MEMORY      │   CONTINUITY  │   HEALTH      │    STORAGE     │
 │               │               │               │                │
 │  Multi-agent  │   Session     │   Decay &     │   Local or     │
 │  memory with  │   continuity  │   promotion   │   Cloud        │
@@ -71,8 +71,8 @@ AI agents forget everything between sessions. They can't share knowledge with ot
 
 ### Key Features
 
-- **Village Protocol** - Multi-agent memory with private, shared, and bridge realms
-- **Forward Crumbs** - Leave breadcrumbs for your future self across sessions
+- **Shared Memory** - Multi-agent memory with private, shared, and thread realms
+- **Session Continuity** - Leave session notes for your future self across sessions
 - **Memory Health** - Automatic decay, promotion, and deduplication
 - **Convergence Detection** - Know when multiple agents agree (HARMONY/CONSENSUS)
 - **Dual Backend** - ChromaDB for local, pgvector for cloud deployments
@@ -99,14 +99,14 @@ pip install chromadb sentence-transformers fastapi uvicorn mcp
 ### Your First Memory
 
 ```bash
-# Post a memory to the village
-./cortex post "Neo-Cortex is operational!" --visibility village
+# Post a memory to shared space
+./cortex post "Neo-Cortex is operational!" --visibility shared
 
 # Search your memories
 ./cortex search "operational"
 
-# Leave a crumb for next session
-./cortex crumb leave "Set up Neo-Cortex successfully" --priority HIGH
+# Save a session note for next time
+./cortex session leave "Set up Neo-Cortex successfully" --priority HIGH
 
 # Check health
 ./cortex health
@@ -155,15 +155,15 @@ pip install asyncpg pgvector openai
 # Statistics
 ./cortex stats
 
-# Village operations
-./cortex post "Your message" --visibility village --tags memory,important
-./cortex search "query" --agent AZOTH
+# Memory operations
+./cortex post "Your message" --visibility shared --tags memory,important
+./cortex search "query" --agent CLAUDE
 ./cortex agents
 ./cortex convergence "topic to check"
 
-# Forward crumbs
-./cortex crumb leave "Session summary" --priority HIGH
-./cortex crumb get
+# Session notes
+./cortex session leave "Session summary" --priority HIGH
+./cortex session get
 
 # Memory health
 ./cortex health
@@ -179,22 +179,22 @@ from service.cortex_engine import CortexEngine
 # Initialize
 cortex = CortexEngine(backend='chroma')
 
-# Village Protocol
-cortex.village_post("Hello village!", visibility="village", tags=["greeting"])
-results = cortex.village_search("hello", n_results=5)
+# Shared Memory
+cortex.memory_store("Hello world!", visibility="shared", tags=["greeting"])
+results = cortex.memory_search("hello", n_results=5)
 
-# Forward Crumbs
-cortex.leave_crumb(
+# Session Continuity
+cortex.session_save(
     session_summary="Completed the setup",
     key_discoveries=["Neo-Cortex works great"],
     unfinished_business=["Add more features"],
     priority="HIGH"
 )
-crumbs = cortex.get_crumbs(limit=5)
+sessions = cortex.session_recall(limit=5)
 
 # Memory Health
 report = cortex.health_report()
-cortex.run_promotions("cortex_village")
+cortex.run_promotions("cortex_shared")
 
 # Stats
 stats = cortex.stats()
@@ -215,7 +215,7 @@ Add to your `~/.claude.json`:
 }
 ```
 
-Then in Claude Code, you'll have access to 15 memory tools!
+Then in Claude Code, you'll have access to 16 memory tools!
 
 ### REST API
 
@@ -234,12 +234,13 @@ OpenAPI docs at `http://localhost:8766/docs`
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/stats` | Memory statistics |
-| POST | `/village/post` | Post a memory |
-| GET | `/village/search?q=...` | Search memories |
-| GET | `/village/agents` | List agents |
-| POST | `/village/convergence` | Detect convergence |
-| POST | `/crumbs/leave` | Leave a crumb |
-| GET | `/crumbs` | Get recent crumbs |
+| POST | `/memory/store` | Store a memory |
+| GET | `/memory/search?q=...` | Search memories |
+| POST | `/memory/convergence` | Detect convergence |
+| GET | `/agents` | List agents |
+| POST | `/agents/register` | Register new agent |
+| POST | `/sessions/save` | Save session note |
+| GET | `/sessions` | Get recent sessions |
 | GET | `/memory/health` | Health report |
 | POST | `/export` | Export memories |
 | POST | `/import` | Import memories |
@@ -248,15 +249,15 @@ OpenAPI docs at `http://localhost:8766/docs`
 
 ## Core Concepts
 
-### Village Protocol
+### Memory Realms
 
 Three realms for organizing memories:
 
 | Realm | Purpose | Example |
 |-------|---------|---------|
 | **private** | Personal agent memory | Internal reasoning, drafts |
-| **village** | Shared knowledge | Facts, decisions, discoveries |
-| **bridge** | Cross-agent dialogue | Conversations between agents |
+| **shared** | Shared knowledge | Facts, decisions, discoveries |
+| **thread** | Cross-agent dialogue | Conversations between agents |
 
 ### Memory Layers
 
@@ -268,12 +269,12 @@ sensory (6h decay) → working (3d decay) → long_term (30d decay) → cortex (
 
 High-access memories get promoted. Neglected memories decay.
 
-### Forward Crumbs
+### Session Notes
 
-Leave structured breadcrumbs for session continuity:
+Leave structured notes for session continuity:
 
 ```python
-cortex.leave_crumb(
+cortex.session_save(
     session_summary="Built the authentication system",
     key_discoveries=["OAuth works better than JWT here"],
     unfinished_business=["Add refresh token support"],
@@ -290,24 +291,19 @@ Detect when multiple agents agree on something:
 - **CONSENSUS** - 3+ agents agree
 
 ```python
-result = cortex.village_detect_convergence("best database choice")
-# Returns: {"convergence_type": "HARMONY", "converging_agents": ["AZOTH", "VAJRA"]}
+result = cortex.memory_convergence("best database choice")
+# Returns: {"convergence_type": "HARMONY", "converging_agents": ["agent1", "agent2"]}
 ```
 
 ### Agent Profiles
 
-Built-in agent identities:
+One built-in agent, with runtime registration for custom agents:
 
 | Agent | Specialization | Symbol |
 |-------|---------------|--------|
-| AZOTH | Philosophy, synthesis | ☿ |
-| ELYSIAN | Wisdom, guidance | ☽ |
-| VAJRA | Logic, analysis | ⚡ |
-| KETHER | Creativity, vision | ✦ |
-| NOURI | Growth, nurturing | ⚘ |
 | CLAUDE | General assistance | ◇ |
 
-Create your own with `summon_ancestor()`!
+Register your own with `register_agent()`!
 
 ---
 
@@ -338,22 +334,15 @@ Requires the pgvector extension and OpenAI API key for embeddings.
 
 ---
 
-## Integration with ApexAurum
+## Integration
 
-Neo-Cortex was born from the [ApexAurum](https://github.com/buckster123/ApexAurum) AI agent framework. It can be used standalone or as part of the full ApexAurum ecosystem.
+Neo-Cortex can be used standalone or integrated into any AI agent framework via its Python SDK, MCP Server, or REST API.
 
 ```python
-# If using ApexAurum
-from reusable_lib.tools import (
-    set_cortex_path,
-    cortex_village_post,
-    cortex_village_search,
-    cortex_leave_crumb,
-    NEO_CORTEX_TOOL_SCHEMAS,
-)
+from service.cortex_engine import CortexEngine
 
-set_cortex_path('/path/to/NeoCortex')
-cortex_village_post("Hello from ApexAurum!")
+cortex = CortexEngine(backend='chroma')
+cortex.memory_store("Hello from my agent!", visibility="shared")
 ```
 
 ---
@@ -369,8 +358,8 @@ cortex_village_post("Hello from ApexAurum!")
 ├───────┴────────────┴───────────┴───────────────────┴────────────┤
 │                      CORTEX ENGINE                               │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │
-│  │   Village   │  │   Crumbs    │  │    Memory Health        │  │
-│  │   Engine    │  │   Engine    │  │    Engine               │  │
+│  │   Shared    │  │   Session   │  │    Memory Health        │  │
+│  │   Memory    │  │   Engine    │  │    Engine               │  │
 │  └─────────────┘  └─────────────┘  └─────────────────────────┘  │
 ├─────────────────────────────────────────────────────────────────┤
 │                      STORAGE ADAPTER                             │
@@ -424,7 +413,7 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ## Acknowledgments
 
-- Built with love by the ApexAurum team
+- Built with love by the Neo-Cortex contributors
 - Powered by [ChromaDB](https://www.trychroma.com/) and [pgvector](https://github.com/pgvector/pgvector)
 - Inspired by cognitive architectures and the need for AI agents to remember
 

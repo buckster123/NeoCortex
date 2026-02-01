@@ -3,8 +3,8 @@ PostgreSQL + pgvector Storage Backend
 
 Cloud vector storage using PostgreSQL with pgvector extension.
 
-This implementation integrates with ApexAurum Cloud's async SQLAlchemy setup
-and OpenAI embedding service.
+This implementation uses async SQLAlchemy with pgvector extension
+and OpenAI embedding service for cloud deployments.
 
 Usage (in cloud backend):
     from neo_cortex.service.storage.pgvector_backend import PgVectorBackend
@@ -16,8 +16,8 @@ Usage (in cloud backend):
     await backend.initialize()
 
     # Now use same interface as ChromaDB
-    ids = await backend.add("cortex_village", records)
-    results = await backend.search("cortex_village", "query text")
+    ids = await backend.add("cortex_shared", records)
+    results = await backend.search("cortex_shared", "query text")
 """
 
 import asyncio
@@ -204,17 +204,17 @@ class PgVectorBackend(StorageBackend):
         Collection names:
         - cortex_knowledge -> visibility='knowledge', layer='cortex'
         - cortex_private   -> visibility='private'
-        - cortex_village   -> visibility='village'
-        - cortex_bridges   -> visibility='bridge'
-        - cortex_crumbs    -> visibility='private', message_type='forward_crumb'
+        - cortex_shared    -> visibility='shared'
+        - cortex_threads   -> visibility='thread'
+        - cortex_sessions  -> visibility='private', message_type='session_note'
         - cortex_sensory   -> visibility='private', layer='sensory'
         """
         mapping = {
             "cortex_knowledge": {"visibility": "knowledge", "layer": "cortex"},
             "cortex_private": {"visibility": "private"},
-            "cortex_village": {"visibility": "village"},
-            "cortex_bridges": {"visibility": "bridge"},
-            "cortex_crumbs": {"visibility": "private", "message_type": "forward_crumb"},
+            "cortex_shared": {"visibility": "shared"},
+            "cortex_threads": {"visibility": "thread"},
+            "cortex_sessions": {"visibility": "private", "message_type": "session_note"},
             "cortex_sensory": {"visibility": "private", "layer": "sensory"},
         }
         return mapping.get(collection, {"collection": collection})

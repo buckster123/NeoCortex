@@ -77,8 +77,8 @@ mypy service/
 NeoCortex/
 ├── service/           # Core Python package
 │   ├── cortex_engine.py    # Main engine
-│   ├── village_engine.py   # Village Protocol
-│   ├── crumbs_engine.py    # Forward Crumbs
+│   ├── shared_engine.py    # Shared Memory
+│   ├── session_engine.py   # Session Continuity
 │   ├── health_engine.py    # Memory Health
 │   ├── mcp_server.py       # MCP server
 │   ├── api_server.py       # REST API
@@ -125,7 +125,7 @@ python -m pytest tests/test_village.py::test_post_message
 Follow conventional commits:
 
 ```
-feat: add convergence detection to village protocol
+feat: add convergence detection to shared memory
 fix: handle empty search results gracefully
 docs: update REST API documentation
 test: add tests for memory health engine

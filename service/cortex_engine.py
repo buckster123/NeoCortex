@@ -3,14 +3,14 @@ Neo-Cortex Engine: Unified Memory Coordinator
 
 The main interface for all memory operations across:
 - Knowledge (curated docs)
-- Village (multi-agent shared memory)
-- Forward Crumbs (session continuity)
+- Shared Memory (multi-agent memory)
+- Sessions (session continuity)
 - Memory Health (access tracking, decay)
 
 Integrates all subsystems:
 - storage/ (ChromaDB/pgvector backends)
-- village_engine.py (multi-agent protocol)
-- crumbs_engine.py (session continuity)
+- shared_engine.py (multi-agent memory)
+- session_engine.py (session continuity)
 
 Supports both local (ChromaDB) and cloud (pgvector) backends.
 """
@@ -30,8 +30,8 @@ from .config import (
 )
 from .storage import ChromaBackend, StorageBackend, MemoryRecord, MemoryCore
 from .storage.chroma_backend import export_to_memory_core, import_from_memory_core
-from .village_engine import VillageEngine, VILLAGE_TOOL_SCHEMAS
-from .crumbs_engine import CrumbsEngine, CRUMBS_TOOL_SCHEMAS
+from .shared_engine import SharedMemoryEngine, SHARED_TOOL_SCHEMAS
+from .session_engine import SessionEngine, SESSION_TOOL_SCHEMAS
 from .health_engine import HealthEngine, HEALTH_TOOL_SCHEMAS
 
 logger = logging.getLogger(__name__)
@@ -42,8 +42,8 @@ class CortexEngine:
     Unified memory engine for Neo-Cortex.
 
     Coordinates all memory subsystems:
-    - Village Protocol (multi-agent memory)
-    - Forward Crumbs (session continuity)
+    - Shared Memory (multi-agent memory)
+    - Sessions (session continuity)
     - Knowledge Base (curated docs)
     - Memory Health (access tracking, decay)
     """
@@ -54,17 +54,8 @@ class CortexEngine:
         chroma_path: Optional[Path] = None,
         db_url: Optional[str] = None,
     ):
-        """
-        Initialize the cortex engine.
-
-        Args:
-            backend: "chroma" or "pgvector"
-            chroma_path: Path for ChromaDB persistence
-            db_url: PostgreSQL connection URL for pgvector
-        """
         self.backend_name = backend
 
-        # Initialize storage backend
         if backend == "chroma":
             self.storage: StorageBackend = ChromaBackend(
                 persist_path=chroma_path or CHROMA_PATH
@@ -78,11 +69,10 @@ class CortexEngine:
             raise ValueError(f"Unknown backend: {backend}")
 
         # Initialize subsystems
-        self.village = VillageEngine(self.storage)
-        self.crumbs = CrumbsEngine(self.storage)
+        self.shared = SharedMemoryEngine(self.storage)
+        self.sessions = SessionEngine(self.storage)
         self.health = HealthEngine(self.storage)
 
-        # Shared state
         self._current_agent_id = "CLAUDE"
 
         logger.info(f"CortexEngine initialized with {backend} backend")
@@ -97,102 +87,93 @@ class CortexEngine:
         logger.info("Cortex initialized")
 
     # =========================================================================
-    # Agent Management (delegated to village)
+    # Agent Management (delegated to shared)
     # =========================================================================
 
     def set_current_agent(self, agent_id: str):
         """Set the current active agent for all subsystems."""
         self._current_agent_id = agent_id.upper()
-        self.village.set_current_agent(agent_id)
-        self.crumbs.set_current_agent(agent_id)
+        self.shared.set_current_agent(agent_id)
+        self.sessions.set_current_agent(agent_id)
         logger.info(f"Current agent set to: {self._current_agent_id}")
 
     def get_current_agent(self) -> str:
-        """Get the current active agent ID."""
         return self._current_agent_id
 
     def get_agent_profile(self, agent_id: str) -> Optional[Dict]:
-        """Get profile for an agent."""
-        return self.village.get_agent_profile(agent_id)
+        return self.shared.get_agent_profile(agent_id)
 
     def list_agents(self) -> Dict[str, Any]:
-        """List all registered agents."""
-        return self.village.list_agents()
+        return self.shared.list_agents()
 
     # =========================================================================
-    # Village Protocol (delegated)
+    # Shared Memory (delegated)
     # =========================================================================
 
-    def village_post(self, content: str, **kwargs) -> Dict[str, Any]:
-        """Post to the village (see village_engine.post)."""
-        return self.village.post(content, **kwargs)
+    def memory_store(self, content: str, **kwargs) -> Dict[str, Any]:
+        """Store a memory (see shared_engine.post)."""
+        return self.shared.post(content, **kwargs)
 
-    def village_search(self, query: str, **kwargs) -> Dict[str, Any]:
-        """Search the village (see village_engine.search)."""
-        return self.village.search(query, **kwargs)
+    def memory_search(self, query: str, **kwargs) -> Dict[str, Any]:
+        """Search shared memory (see shared_engine.search)."""
+        return self.shared.search(query, **kwargs)
 
-    def village_detect_convergence(self, query: str, **kwargs) -> Dict[str, Any]:
-        """Detect convergence (see village_engine.detect_convergence)."""
-        return self.village.detect_convergence(query, **kwargs)
+    def memory_convergence(self, query: str, **kwargs) -> Dict[str, Any]:
+        """Detect convergence (see shared_engine.detect_convergence)."""
+        return self.shared.detect_convergence(query, **kwargs)
 
-    def summon_ancestor(self, **kwargs) -> Dict[str, Any]:
-        """Summon an ancestor (see village_engine.summon_ancestor)."""
-        return self.village.summon_ancestor(**kwargs)
+    def register_agent(self, **kwargs) -> Dict[str, Any]:
+        """Register an agent (see shared_engine.register_agent)."""
+        return self.shared.register_agent(**kwargs)
 
-    def introduction_ritual(self, **kwargs) -> Dict[str, Any]:
-        """Introduction ritual (see village_engine.introduction_ritual)."""
-        return self.village.introduction_ritual(**kwargs)
+    def agent_greeting(self, **kwargs) -> Dict[str, Any]:
+        """Agent greeting (see shared_engine.agent_greeting)."""
+        return self.shared.agent_greeting(**kwargs)
 
-    def village_get_thread(self, thread_id: str, **kwargs) -> Dict[str, Any]:
-        """Get thread (see village_engine.get_thread)."""
-        return self.village.get_thread(thread_id, **kwargs)
+    def memory_get_thread(self, thread_id: str, **kwargs) -> Dict[str, Any]:
+        """Get thread (see shared_engine.get_thread)."""
+        return self.shared.get_thread(thread_id, **kwargs)
 
     # =========================================================================
-    # Forward Crumbs (delegated)
+    # Sessions (delegated)
     # =========================================================================
 
-    def leave_crumb(self, session_summary: str, **kwargs) -> Dict[str, Any]:
-        """Leave a forward crumb (see crumbs_engine.leave_crumb)."""
-        return self.crumbs.leave_crumb(session_summary, **kwargs)
+    def session_save(self, session_summary: str, **kwargs) -> Dict[str, Any]:
+        """Save a session note (see session_engine.save_session)."""
+        return self.sessions.save_session(session_summary, **kwargs)
 
-    def get_crumbs(self, **kwargs) -> Dict[str, Any]:
-        """Get forward crumbs (see crumbs_engine.get_crumbs)."""
-        return self.crumbs.get_crumbs(**kwargs)
+    def session_recall(self, **kwargs) -> Dict[str, Any]:
+        """Recall session notes (see session_engine.recall_sessions)."""
+        return self.sessions.recall_sessions(**kwargs)
 
-    def quick_crumb(self, summary: str, **kwargs) -> Dict[str, Any]:
-        """Quick crumb shortcut."""
-        return self.crumbs.quick_crumb(summary, **kwargs)
+    def quick_session_note(self, summary: str, **kwargs) -> Dict[str, Any]:
+        """Quick session note shortcut."""
+        return self.sessions.quick_session_note(summary, **kwargs)
 
     def get_unfinished_tasks(self) -> List[str]:
-        """Get unfinished tasks from recent crumbs."""
-        return self.crumbs.get_unfinished_tasks()
+        """Get unfinished tasks from recent sessions."""
+        return self.sessions.get_unfinished_tasks()
 
     # =========================================================================
     # Memory Health (delegated)
     # =========================================================================
 
     def health_report(self, **kwargs) -> Dict[str, Any]:
-        """Generate memory health report (see health_engine.health_report)."""
         return self.health.health_report(**kwargs)
 
     def get_stale_memories(self, collection: str, **kwargs) -> Dict[str, Any]:
-        """Get stale memories (see health_engine.get_stale_memories)."""
         return self.health.get_stale_memories(collection, **kwargs)
 
     def get_duplicate_candidates(self, collection: str, **kwargs) -> Dict[str, Any]:
-        """Get duplicate candidates (see health_engine.get_duplicate_candidates)."""
         return self.health.get_duplicate_candidates(collection, **kwargs)
 
     def consolidate_memories(self, collection: str, id1: str, id2: str, **kwargs) -> Dict[str, Any]:
-        """Consolidate memories (see health_engine.consolidate_memories)."""
         return self.health.consolidate_memories(collection, id1, id2, **kwargs)
 
     def run_promotions(self, collection: str, **kwargs) -> Dict[str, Any]:
-        """Run layer promotions (see health_engine.run_promotions)."""
         return self.health.run_promotions(collection, **kwargs)
 
     def update_attention_weights(self, collection: str, **kwargs) -> Dict[str, Any]:
-        """Update attention weights (see health_engine.update_attention_weights)."""
         return self.health.update_attention_weights(collection, **kwargs)
 
     # =========================================================================
@@ -208,7 +189,7 @@ class CortexEngine:
         """
         Store a memory directly in a collection.
 
-        For village/private/bridge, use village_post() instead.
+        For shared/private/thread, use memory_store() instead.
         This is for knowledge base entries and direct storage.
         """
         try:
@@ -245,7 +226,7 @@ class CortexEngine:
         """
         Search across specified collections.
 
-        For village search, use village_search() instead.
+        For shared memory search, use memory_search() instead.
         This is for cross-collection and knowledge base search.
         """
         try:
@@ -263,7 +244,6 @@ class CortexEngine:
                     r.collection = coll
                 all_results.extend(results)
 
-            # Sort by similarity
             all_results.sort(key=lambda x: x.similarity or 0, reverse=True)
             all_results = all_results[:n_results]
 
@@ -287,16 +267,6 @@ class CortexEngine:
         agent_id: Optional[str] = None,
         collections: Optional[List[str]] = None,
     ) -> MemoryCore:
-        """
-        Export memories to portable MemoryCore format.
-
-        Args:
-            agent_id: Filter by agent (None for all)
-            collections: Which collections (None for all)
-
-        Returns:
-            MemoryCore object ready for JSON serialization
-        """
         if isinstance(self.storage, ChromaBackend):
             return export_to_memory_core(
                 self.storage,
@@ -311,16 +281,6 @@ class CortexEngine:
         core: MemoryCore,
         re_embed: bool = True,
     ) -> Dict[str, int]:
-        """
-        Import memories from MemoryCore format.
-
-        Args:
-            core: MemoryCore object to import
-            re_embed: Whether to regenerate embeddings
-
-        Returns:
-            Dict with import stats per collection
-        """
         if isinstance(self.storage, ChromaBackend):
             return import_from_memory_core(
                 self.storage,
@@ -335,7 +295,6 @@ class CortexEngine:
     # =========================================================================
 
     def stats(self) -> Dict[str, Any]:
-        """Get comprehensive statistics about the cortex."""
         try:
             stats = {
                 "success": True,
@@ -345,11 +304,10 @@ class CortexEngine:
                 "registered_agents": len(AGENT_PROFILES),
                 "collections": {},
                 "total_memories": 0,
-                "village": None,
-                "crumbs": None,
+                "shared": None,
+                "sessions": None,
             }
 
-            # Collection counts
             for coll_name in ALL_COLLECTIONS:
                 try:
                     count = self.storage.count(coll_name)
@@ -358,9 +316,8 @@ class CortexEngine:
                 except:
                     stats["collections"][coll_name] = 0
 
-            # Subsystem stats
-            stats["village"] = self.village.stats()
-            stats["crumbs"] = self.crumbs.stats()
+            stats["shared"] = self.shared.stats()
+            stats["sessions"] = self.sessions.stats()
 
             return stats
 
@@ -391,20 +348,20 @@ def set_engine(engine: CortexEngine):
 
 
 # Convenience functions
-def village_post(content: str, **kwargs) -> Dict:
-    return get_engine().village_post(content, **kwargs)
+def memory_store(content: str, **kwargs) -> Dict:
+    return get_engine().memory_store(content, **kwargs)
 
 
-def village_search(query: str, **kwargs) -> Dict:
-    return get_engine().village_search(query, **kwargs)
+def memory_search(query: str, **kwargs) -> Dict:
+    return get_engine().memory_search(query, **kwargs)
 
 
-def leave_crumb(session_summary: str, **kwargs) -> Dict:
-    return get_engine().leave_crumb(session_summary, **kwargs)
+def session_save(session_summary: str, **kwargs) -> Dict:
+    return get_engine().session_save(session_summary, **kwargs)
 
 
-def get_crumbs(**kwargs) -> Dict:
-    return get_engine().get_crumbs(**kwargs)
+def session_recall(**kwargs) -> Dict:
+    return get_engine().session_recall(**kwargs)
 
 
 def stats() -> Dict:
@@ -416,9 +373,32 @@ def stats() -> Dict:
 # =============================================================================
 
 CORTEX_TOOL_SCHEMAS = {
-    **VILLAGE_TOOL_SCHEMAS,
-    **CRUMBS_TOOL_SCHEMAS,
+    **SHARED_TOOL_SCHEMAS,
+    **SESSION_TOOL_SCHEMAS,
     **HEALTH_TOOL_SCHEMAS,
+    "knowledge_search": {
+        "name": "knowledge_search",
+        "description": (
+            "Search the knowledge base for documentation and reference material. "
+            "Use this to find information about frameworks, tools, APIs, and guides "
+            "that have been ingested into the cortex knowledge collection."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Natural language search query"
+                },
+                "n_results": {
+                    "type": "integer",
+                    "description": "Number of results to return (default 5, max 20)",
+                    "default": 5
+                },
+            },
+            "required": ["query"]
+        }
+    },
     "cortex_stats": {
         "name": "cortex_stats",
         "description": "Get comprehensive statistics about the neo-cortex memory system.",

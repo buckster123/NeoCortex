@@ -12,7 +12,7 @@
 **IT'S DONE!** The neo-cortex is fully operational with:
 - MCP Server for Claude Code
 - REST API for web access
-- ApexAurum tools integration
+- Python SDK integration
 
 You're inheriting a **complete** unified memory system.
 
@@ -27,8 +27,8 @@ You're inheriting a **complete** unified memory system.
 │                        NEO-CORTEX                                │
 ├───────────────┬───────────────┬───────────────┬────────────────┤
 │  KNOWLEDGE    │   EPISODIC    │    SOCIAL     │    HEALTH      │
-│  (KB docs)    │  (forward     │   (Village    │  (decay,       │
-│               │   crumbs)     │   protocol)   │   promotions)  │
+│  (KB docs)    │  (session     │   (shared     │  (decay,       │
+│               │   notes)      │   memory)     │   promotions)  │
 ├───────────────┴───────────────┴───────────────┴────────────────┤
 │                    STORAGE ADAPTER                               │
 │            ChromaDB (local) ←→ pgvector (cloud)                 │
@@ -44,22 +44,26 @@ You're inheriting a **complete** unified memory system.
 | Storage Protocol | `service/storage/base.py` | ✅ Full |
 | ChromaDB Backend | `service/storage/chroma_backend.py` | ✅ Full |
 | pgvector Backend | `service/storage/pgvector_backend.py` | ✅ Full (cloud partner) |
-| Village Protocol | `service/village_engine.py` | ✅ Full |
-| Forward Crumbs | `service/crumbs_engine.py` | ✅ Full |
+| Shared Memory | `service/shared_engine.py` | ✅ Full |
+| Session Continuity | `service/session_engine.py` | ✅ Full |
 | Memory Health | `service/health_engine.py` | ✅ Full |
 | Unified Engine | `service/cortex_engine.py` | ✅ Full |
 | CLI | `service/cortex_cli.py` + `cortex` | ✅ Full |
 | **MCP Server** | `service/mcp_server.py` + `cortex-mcp` | ✅ **NEW** |
 | **REST API** | `service/api_server.py` + `cortex-api` | ✅ **NEW** |
-| **ApexAurum Integration** | `reusable_lib/tools/neo_cortex.py` | ✅ **NEW** |
+| **Python SDK** | `service/cortex_engine.py` | ✅ **Full** |
 
-### 15 Tools Available (via all interfaces)
+### 16 Tools Available (via all interfaces)
 
-Village: `village_post`, `village_search`, `village_detect_convergence`, `summon_ancestor`, `village_list_agents`, `village_stats`
+Memory: `memory_store`, `memory_search`, `memory_convergence`, `memory_stats`
 
-Crumbs: `leave_forward_crumb`, `get_forward_crumbs`
+Agents: `register_agent`, `list_agents`
+
+Sessions: `session_save`, `session_recall`
 
 Health: `memory_health_report`, `memory_get_stale`, `memory_get_duplicates`, `memory_consolidate`, `memory_run_promotions`
+
+Knowledge: `knowledge_search`
 
 Core: `cortex_stats`, `cortex_export`
 
@@ -80,8 +84,8 @@ Core: `cortex_stats`, `cortex_export`
 │   ├── config.py             # All settings
 │   ├── embeddings.py         # Embedding functions
 │   ├── cortex_engine.py      # Main unified engine
-│   ├── village_engine.py     # Village Protocol
-│   ├── crumbs_engine.py      # Forward Crumbs
+│   ├── shared_engine.py      # Shared Memory
+│   ├── session_engine.py     # Session Continuity
 │   ├── health_engine.py      # Memory Health
 │   ├── cortex_cli.py         # CLI implementation
 │   ├── mcp_server.py         # MCP server (NEW)
@@ -103,9 +107,9 @@ Core: `cortex_stats`, `cortex_export`
 cd /home/hailo/claude-root/neo-cortex
 ./cortex stats
 ./cortex search "memory system"
-./cortex post "Hello village" --visibility village
-./cortex crumb leave "Session summary" --priority HIGH
-./cortex crumb get
+./cortex post "Hello world" --visibility shared
+./cortex session leave "Session summary" --priority HIGH
+./cortex session get
 ./cortex health
 ```
 
@@ -127,20 +131,12 @@ Add to `~/.claude.json`:
 # Docs at http://localhost:8766/docs
 ```
 
-### ApexAurum Integration
+### Python SDK
 ```python
-from reusable_lib.tools import (
-    set_cortex_path,
-    cortex_stats,
-    cortex_village_post,
-    cortex_village_search,
-    cortex_leave_crumb,
-    cortex_get_crumbs,
-    NEO_CORTEX_TOOL_SCHEMAS,
-)
+from service.cortex_engine import CortexEngine
 
-set_cortex_path('/home/hailo/claude-root/neo-cortex')
-cortex_village_post("Hello from ApexAurum!")
+cortex = CortexEngine(backend='chroma')
+cortex.memory_store("Hello from my agent!", visibility="shared")
 ```
 
 ---
@@ -152,15 +148,18 @@ GET  /                     - API info
 GET  /health               - Health check
 GET  /stats                - Cortex statistics
 
-POST /village/post         - Post a message
-GET  /village/search       - Search memories
-GET  /village/agents       - List agents
-POST /village/convergence  - Detect convergence
-POST /village/summon       - Summon ancestor
+POST /memory/store         - Store a memory
+GET  /memory/search        - Search memories
+POST /memory/convergence   - Detect convergence
+GET  /memory/stats         - Memory statistics
 
-POST /crumbs/leave         - Leave a crumb
-GET  /crumbs               - Get recent crumbs
-GET  /crumbs/tasks         - Unfinished tasks
+GET  /agents               - List agents
+GET  /agents/{id}          - Get agent profile
+POST /agents/register      - Register new agent
+
+POST /sessions/save        - Save session note
+GET  /sessions             - Get recent sessions
+GET  /sessions/tasks       - Unfinished tasks
 
 GET  /memory/health        - Health report
 GET  /memory/stale/{coll}  - Stale memories
@@ -182,17 +181,17 @@ POST /remember             - Quick store
 ### Memory Layers
 - **sensory** (6h decay) → **working** (3d decay) → **long_term** (30d decay) → **cortex** (permanent)
 
-### Village Realms
+### Memory Realms
 - **private** - Agent's personal memory
-- **village** - Shared knowledge square
-- **bridges** - Cross-agent dialogue
+- **shared** - Shared knowledge space
+- **thread** - Cross-agent dialogue
 
 ### Convergence
 - **HARMONY** - 2 agents agree
 - **CONSENSUS** - 3+ agents agree
 
 ### Agent Profiles
-AZOTH, ELYSIAN, VAJRA, KETHER, NOURI, CLAUDE
+CLAUDE (default) - additional agents registered at runtime
 
 ---
 

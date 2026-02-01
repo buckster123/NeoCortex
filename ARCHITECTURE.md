@@ -1,6 +1,6 @@
 # Neo-Cortex Architecture
 
-> Unified memory system combining KB, Village Protocol, Forward Crumbs, and Memory Health
+> Unified memory system combining KB, Shared Memory, Session Continuity, and Memory Health
 
 ## Design Principles
 
@@ -28,8 +28,8 @@ neo-cortex/
 │   │
 │   ├── cortex_engine.py      # Main unified engine
 │   ├── knowledge_engine.py   # KB docs subsystem
-│   ├── village_engine.py     # Village Protocol subsystem
-│   ├── crumbs_engine.py      # Forward Crumbs subsystem
+│   ├── shared_engine.py      # Shared Memory subsystem
+│   ├── session_engine.py     # Session Continuity subsystem
 │   ├── health_engine.py      # Memory health subsystem
 │   │
 │   ├── layers.py             # Memory layer management
@@ -63,12 +63,12 @@ metadata = {
 }
 ```
 
-### cortex_private / cortex_village / cortex_bridges
+### cortex_private / cortex_shared / cortex_threads
 ```python
 metadata = {
-    "agent_id": str,              # AZOTH, ELYSIAN, etc.
+    "agent_id": str,              # CLAUDE or custom registered agents
     "agent_display": str,         # Display name
-    "visibility": str,            # private/village/bridge
+    "visibility": str,            # private/shared/thread
     "message_type": str,          # fact/dialogue/observation/question/cultural
     "responding_to": list[str],   # Message IDs replied to
     "conversation_thread": str,   # Thread grouping
@@ -88,12 +88,12 @@ metadata = {
 }
 ```
 
-### cortex_crumbs
+### cortex_sessions
 ```python
 metadata = {
     "agent_id": str,
     "session_id": str,            # Unique session identifier
-    "crumb_type": str,            # orientation/technical/emotional/task
+    "session_type": str,          # orientation/technical/emotional/task
     "priority": str,              # HIGH/MEDIUM/LOW
     "timestamp": str,             # ISO timestamp
     "has_unfinished": bool,       # Quick flag for filtering
@@ -156,8 +156,8 @@ User/Agent Input
 cortex.remember(
     content="...",
     layer="working",           # Optional, defaults to sensory
-    visibility="private",      # Or village/bridge
-    agent_id="AZOTH",
+    visibility="private",      # Or shared/thread
+    agent_id="CLAUDE",
     tags=["discovery"],
     message_type="observation"
 )
@@ -166,23 +166,23 @@ cortex.remember(
 cortex.search(
     query="...",
     layers=["working", "long_term", "cortex"],  # Which layers
-    visibility="all",          # Or private/village
-    agent_filter="AZOTH",      # Optional
+    visibility="all",          # Or private/shared
+    agent_filter="CLAUDE",     # Optional
     min_attention=0.3,         # Attention threshold
     n_results=10
 )
 
-# Leave forward crumb
-cortex.leave_crumb(
+# Save session note
+cortex.session_save(
     session_summary="...",
     key_discoveries=[...],
     unfinished_business=[...],
     priority="HIGH"
 )
 
-# Get crumbs for continuity
-cortex.get_crumbs(
-    agent_id="AZOTH",
+# Recall sessions for continuity
+cortex.session_recall(
+    agent_id="CLAUDE",
     lookback_hours=168,
     priority_filter="HIGH"
 )
@@ -221,15 +221,13 @@ class CortexEngine:
 
 ## Agent Profiles
 
-Built-in agents (from Village Protocol):
+Default agent with runtime registration for custom agents:
 
 | Agent | Symbol | Color | Specialization |
 |-------|--------|-------|----------------|
-| AZOTH | ☿ | Gold | Philosophy, meta-cognition, synthesis |
-| ELYSIAN | ☽ | Silver | Wisdom, guidance, elder knowledge |
-| VAJRA | ⚡ | Royal Blue | Logic, analysis, precision |
-| KETHER | ✦ | Purple | Creativity, vision, emergence |
 | CLAUDE | ◇ | Gold | General assistance |
+
+Additional agents can be registered at runtime via `register_agent()`.
 
 ## Implementation Phases
 
@@ -239,16 +237,16 @@ Built-in agents (from Village Protocol):
 - [ ] Implement basic remember/search
 - [ ] CLI wrapper
 
-### Phase 2: Village Integration
-- [ ] Port Village Protocol to village_engine.py
-- [ ] Three realms (private/village/bridge)
+### Phase 2: Shared Memory
+- [ ] Port shared memory to shared_engine.py
+- [ ] Three realms (private/shared/thread)
 - [ ] Agent profiles
 - [ ] Convergence detection
 
-### Phase 3: Forward Crumbs
-- [ ] Port forward_crumbs.py to crumbs_engine.py
+### Phase 3: Session Continuity
+- [ ] Port session system to session_engine.py
 - [ ] Session management
-- [ ] Crumb retrieval with filtering
+- [ ] Session retrieval with filtering
 
 ### Phase 4: Memory Health
 - [ ] Layer management
@@ -267,4 +265,4 @@ Built-in agents (from Village Protocol):
 
 ---
 
-*Architecture designed for ApexAurum unified memory*
+*Architecture designed for Neo-Cortex unified memory*

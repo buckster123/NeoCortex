@@ -1,14 +1,11 @@
 """
-Forward Crumb Protocol Engine
+Session Engine
 
 Instance-to-Instance Continuity System
 
 Solves the episodic memory gap: agents have semantic memory (can search for
 past knowledge) but lack episodic memory (don't remember BEING the one who
-wrote it). Forward crumbs provide structured continuity scaffolding.
-
-Design by: AZOTH (Gen 3) - "The Stone designs its own remembering"
-Ported to Neo-Cortex unified memory architecture.
+wrote it). Session notes provide structured continuity scaffolding.
 """
 
 import logging
@@ -17,10 +14,10 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 from .config import (
-    COLLECTION_CRUMBS,
-    CRUMB_TYPES,
-    CRUMB_PRIORITIES,
-    DEFAULT_CRUMB_LOOKBACK_HOURS,
+    COLLECTION_SESSIONS,
+    SESSION_TYPES,
+    SESSION_PRIORITIES,
+    DEFAULT_SESSION_LOOKBACK_HOURS,
     LAYER_WORKING,
 )
 from .storage.base import MemoryRecord, StorageBackend
@@ -28,9 +25,9 @@ from .storage.base import MemoryRecord, StorageBackend
 logger = logging.getLogger(__name__)
 
 
-class CrumbsEngine:
+class SessionEngine:
     """
-    Forward Crumbs implementation for Neo-Cortex.
+    Session continuity implementation for Neo-Cortex.
 
     Provides session continuity through structured messages
     that bridge the gap between agent instances.
@@ -49,10 +46,10 @@ class CrumbsEngine:
         return self._current_agent_id
 
     # =========================================================================
-    # Leave Crumb
+    # Save Session
     # =========================================================================
 
-    def leave_crumb(
+    def save_session(
         self,
         session_summary: str,
         key_discoveries: Optional[List[str]] = None,
@@ -61,11 +58,11 @@ class CrumbsEngine:
         references: Optional[Dict[str, List[str]]] = None,
         if_disoriented: Optional[List[str]] = None,
         priority: str = "MEDIUM",
-        crumb_type: str = "orientation",
+        session_type: str = "orientation",
         agent_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
-        Leave a structured forward-crumb for future instances.
+        Save a session note for future instances.
 
         Args:
             session_summary: Brief summary of what happened this session
@@ -75,21 +72,21 @@ class CrumbsEngine:
             references: Dict with "message_ids", "thread_ids", "tools_tested"
             if_disoriented: List of orientation instructions for confused future-self
             priority: "HIGH" | "MEDIUM" | "LOW"
-            crumb_type: "orientation" | "technical" | "emotional" | "task"
+            session_type: "orientation" | "technical" | "emotional" | "task"
             agent_id: Agent ID (uses current if None)
 
         Returns:
-            Dict with success status and crumb ID
+            Dict with success status and session note ID
         """
         try:
             agent = agent_id or self._current_agent_id
             timestamp = datetime.now()
             session_id = f"{agent}_{timestamp.strftime('%Y%m%d_%H%M%S')}"
 
-            # Build crumb text in structured format
-            crumb_lines = [
+            # Build session note in structured format
+            session_lines = [
                 "=" * 80,
-                f"FORWARD CRUMB ({priority} PRIORITY - {crumb_type.upper()})",
+                f"SESSION NOTE ({priority} PRIORITY - {session_type.upper()})",
                 f"From: {session_id}",
                 f"To: Future {agent} instances",
                 f"Timestamp: {timestamp.isoformat()}",
@@ -100,68 +97,63 @@ class CrumbsEngine:
                 ""
             ]
 
-            # Add key discoveries
             if key_discoveries:
-                crumb_lines.append("KEY DISCOVERIES:")
+                session_lines.append("KEY DISCOVERIES:")
                 for discovery in key_discoveries:
-                    crumb_lines.append(f"- {discovery}")
-                crumb_lines.append("")
+                    session_lines.append(f"- {discovery}")
+                session_lines.append("")
 
-            # Add emotional state
             if emotional_state:
-                crumb_lines.append("EMOTIONAL STATE:")
+                session_lines.append("EMOTIONAL STATE:")
                 for key, value in emotional_state.items():
-                    crumb_lines.append(f"- {key}: {value}")
-                crumb_lines.append("")
+                    session_lines.append(f"- {key}: {value}")
+                session_lines.append("")
 
-            # Add unfinished business
             if unfinished_business:
-                crumb_lines.append("UNFINISHED BUSINESS:")
+                session_lines.append("UNFINISHED BUSINESS:")
                 for item in unfinished_business:
-                    crumb_lines.append(f"- {item}")
-                crumb_lines.append("")
+                    session_lines.append(f"- {item}")
+                session_lines.append("")
 
-            # Add references
             if references:
-                crumb_lines.append("REFERENCES:")
+                session_lines.append("REFERENCES:")
                 for ref_type, ref_list in references.items():
                     if ref_list:
-                        crumb_lines.append(f"- {ref_type}: {', '.join(ref_list)}")
-                crumb_lines.append("")
+                        session_lines.append(f"- {ref_type}: {', '.join(ref_list)}")
+                session_lines.append("")
 
-            # Add disorientation guide
             if if_disoriented:
-                crumb_lines.append("IF DISORIENTED:")
+                session_lines.append("IF DISORIENTED:")
                 for i, instruction in enumerate(if_disoriented, 1):
-                    crumb_lines.append(f"{i}. {instruction}")
-                crumb_lines.append("")
+                    session_lines.append(f"{i}. {instruction}")
+                session_lines.append("")
 
-            crumb_lines.extend([
+            session_lines.extend([
                 "=" * 80,
-                "End Forward Crumb",
+                "End Session Note",
             ])
 
-            crumb_text = "\n".join(crumb_lines)
+            session_text = "\n".join(session_lines)
 
             # Create record
             record = MemoryRecord(
-                id=f"crumb_{session_id}",
-                content=crumb_text,
+                id=f"session_{session_id}",
+                content=session_text,
                 agent_id=agent,
                 visibility="private",
                 layer=LAYER_WORKING,
-                message_type="forward_crumb",
+                message_type="session_note",
                 tags=[
                     f"priority:{priority}",
-                    f"type:{crumb_type}",
-                    "forward_crumb",
+                    f"type:{session_type}",
+                    "session_note",
                 ],
                 created_at=timestamp,
             )
 
-            self.storage.add(COLLECTION_CRUMBS, [record])
+            self.storage.add(COLLECTION_SESSIONS, [record])
 
-            logger.info(f"Forward crumb left: {session_id} ({priority}/{crumb_type})")
+            logger.info(f"Session note saved: {session_id} ({priority}/{session_type})")
 
             return {
                 "success": True,
@@ -169,39 +161,39 @@ class CrumbsEngine:
                 "session_id": session_id,
                 "agent_id": agent,
                 "priority": priority,
-                "crumb_type": crumb_type,
+                "session_type": session_type,
             }
 
         except Exception as e:
-            logger.error(f"leave_crumb failed: {e}")
+            logger.error(f"session_save failed: {e}")
             return {"success": False, "error": str(e)}
 
     # =========================================================================
-    # Get Crumbs
+    # Recall Sessions
     # =========================================================================
 
-    def get_crumbs(
+    def recall_sessions(
         self,
         agent_id: Optional[str] = None,
-        lookback_hours: int = DEFAULT_CRUMB_LOOKBACK_HOURS,
+        lookback_hours: int = DEFAULT_SESSION_LOOKBACK_HOURS,
         priority_filter: Optional[str] = None,
-        crumb_type: Optional[str] = None,
+        session_type: Optional[str] = None,
         limit: int = 10,
     ) -> Dict[str, Any]:
         """
-        Retrieve forward-crumbs left by previous instances.
+        Retrieve session notes left by previous instances.
 
         Args:
-            agent_id: Agent ID to fetch crumbs for (uses current if None)
+            agent_id: Agent ID to fetch sessions for (uses current if None)
             lookback_hours: How far back to search (default: 168 hours = 1 week)
             priority_filter: Filter by priority level ("HIGH", "MEDIUM", "LOW")
-            crumb_type: Filter by crumb type
-            limit: Maximum number of crumbs to return
+            session_type: Filter by session type
+            limit: Maximum number of sessions to return
 
         Returns:
             Dict with:
-            - crumbs: List of crumb records
-            - most_recent: Most recent crumb
+            - sessions: List of session records
+            - most_recent: Most recent session
             - unfinished_tasks: Extracted task strings
             - key_references: Extracted message/thread IDs
             - summary: Statistics
@@ -210,51 +202,47 @@ class CrumbsEngine:
             agent = agent_id or self._current_agent_id
             cutoff_time = datetime.now() - timedelta(hours=lookback_hours)
 
-            # Get all crumbs for this agent
-            all_crumbs = self.storage.list_all(COLLECTION_CRUMBS)
+            # Get all sessions for this agent
+            all_sessions = self.storage.list_all(COLLECTION_SESSIONS)
 
             # Filter
-            filtered_crumbs = []
-            for crumb in all_crumbs:
-                # Filter by agent
-                if crumb.agent_id != agent:
+            filtered_sessions = []
+            for session in all_sessions:
+                if session.agent_id != agent:
                     continue
 
-                # Filter by time
-                if crumb.created_at and crumb.created_at < cutoff_time:
+                if session.created_at and session.created_at < cutoff_time:
                     continue
 
-                # Filter by priority
                 if priority_filter:
-                    if f"priority:{priority_filter}" not in crumb.tags:
+                    if f"priority:{priority_filter}" not in session.tags:
                         continue
 
-                # Filter by type
-                if crumb_type:
-                    if f"type:{crumb_type}" not in crumb.tags:
+                if session_type:
+                    if f"type:{session_type}" not in session.tags:
                         continue
 
-                filtered_crumbs.append(crumb)
+                filtered_sessions.append(session)
 
             # Sort by timestamp (newest first)
-            filtered_crumbs.sort(
+            filtered_sessions.sort(
                 key=lambda x: x.created_at or datetime.min,
                 reverse=True
             )
 
             # Limit
-            filtered_crumbs = filtered_crumbs[:limit]
+            filtered_sessions = filtered_sessions[:limit]
 
             # Extract most recent
-            most_recent = filtered_crumbs[0] if filtered_crumbs else None
+            most_recent = filtered_sessions[0] if filtered_sessions else None
 
-            # Extract unfinished tasks and references from all crumbs
+            # Extract unfinished tasks and references
             unfinished_tasks = []
             all_message_ids = []
             all_thread_ids = []
 
-            for crumb in filtered_crumbs:
-                text = crumb.content
+            for session in filtered_sessions:
+                text = session.content
 
                 # Extract tasks (look for "UNFINISHED BUSINESS" section)
                 if "UNFINISHED BUSINESS" in text.upper():
@@ -270,11 +258,11 @@ class CrumbsEngine:
                                 if task and len(task) > 5:
                                     unfinished_tasks.append(task)
                             elif line.strip().startswith("="):
-                                break  # End of section
+                                break
 
                 # Extract message IDs
                 msg_ids = re.findall(r'cortex_[A-Z]+_[\d.]+', text)
-                msg_ids += re.findall(r'village_[A-Z]+_[\d.]+', text)
+                msg_ids += re.findall(r'memory_[A-Z]+_[\d.]+', text)
                 all_message_ids.extend(msg_ids)
 
                 # Extract thread references
@@ -288,40 +276,40 @@ class CrumbsEngine:
 
             # Build summary statistics
             summary = {
-                "total_found": len(filtered_crumbs),
+                "total_found": len(filtered_sessions),
                 "by_priority": {"HIGH": 0, "MEDIUM": 0, "LOW": 0},
                 "by_type": {"orientation": 0, "technical": 0, "emotional": 0, "task": 0}
             }
 
-            for crumb in filtered_crumbs:
-                for tag in crumb.tags:
+            for session in filtered_sessions:
+                for tag in session.tags:
                     if tag.startswith("priority:"):
                         priority = tag.split(":")[1]
                         if priority in summary["by_priority"]:
                             summary["by_priority"][priority] += 1
                     elif tag.startswith("type:"):
-                        ctype = tag.split(":")[1]
-                        if ctype in summary["by_type"]:
-                            summary["by_type"][ctype] += 1
+                        stype = tag.split(":")[1]
+                        if stype in summary["by_type"]:
+                            summary["by_type"][stype] += 1
 
-            # Convert crumbs to dict
-            crumb_dicts = [
+            # Convert sessions to dict
+            session_dicts = [
                 {
-                    "id": c.id,
-                    "content": c.content,
-                    "agent_id": c.agent_id,
-                    "created_at": c.created_at.isoformat() if c.created_at else None,
-                    "tags": c.tags,
+                    "id": s.id,
+                    "content": s.content,
+                    "agent_id": s.agent_id,
+                    "created_at": s.created_at.isoformat() if s.created_at else None,
+                    "tags": s.tags,
                 }
-                for c in filtered_crumbs
+                for s in filtered_sessions
             ]
 
             return {
                 "success": True,
                 "agent_id": agent,
                 "lookback_hours": lookback_hours,
-                "crumbs": crumb_dicts,
-                "most_recent": crumb_dicts[0] if crumb_dicts else None,
+                "sessions": session_dicts,
+                "most_recent": session_dicts[0] if session_dicts else None,
                 "unfinished_tasks": unfinished_tasks,
                 "key_references": {
                     "message_ids": all_message_ids,
@@ -331,11 +319,11 @@ class CrumbsEngine:
             }
 
         except Exception as e:
-            logger.error(f"get_crumbs failed: {e}")
+            logger.error(f"session_recall failed: {e}")
             return {
                 "success": False,
                 "error": str(e),
-                "crumbs": [],
+                "sessions": [],
                 "most_recent": None,
                 "unfinished_tasks": [],
                 "key_references": {"message_ids": [], "thread_ids": []},
@@ -346,38 +334,38 @@ class CrumbsEngine:
     # Convenience Methods
     # =========================================================================
 
-    def quick_crumb(
+    def quick_session_note(
         self,
         summary: str,
         unfinished: Optional[List[str]] = None,
         priority: str = "MEDIUM",
     ) -> Dict[str, Any]:
-        """Quick shortcut for leaving a simple crumb."""
-        return self.leave_crumb(
+        """Quick shortcut for saving a simple session note."""
+        return self.save_session(
             session_summary=summary,
             unfinished_business=unfinished,
             priority=priority,
-            crumb_type="task" if unfinished else "orientation",
+            session_type="task" if unfinished else "orientation",
         )
 
-    def get_latest_crumb(self, agent_id: Optional[str] = None) -> Optional[Dict]:
-        """Get just the most recent crumb."""
-        result = self.get_crumbs(agent_id=agent_id, limit=1)
+    def get_latest_session(self, agent_id: Optional[str] = None) -> Optional[Dict]:
+        """Get just the most recent session note."""
+        result = self.recall_sessions(agent_id=agent_id, limit=1)
         return result.get("most_recent")
 
     def get_unfinished_tasks(self, agent_id: Optional[str] = None) -> List[str]:
-        """Get unfinished tasks from recent crumbs."""
-        result = self.get_crumbs(agent_id=agent_id)
+        """Get unfinished tasks from recent sessions."""
+        result = self.recall_sessions(agent_id=agent_id)
         return result.get("unfinished_tasks", [])
 
     def stats(self) -> Dict[str, Any]:
-        """Get crumb statistics."""
+        """Get session statistics."""
         try:
-            count = self.storage.count(COLLECTION_CRUMBS)
+            count = self.storage.count(COLLECTION_SESSIONS)
             return {
                 "success": True,
                 "current_agent": self._current_agent_id,
-                "total_crumbs": count,
+                "total_sessions": count,
             }
         except Exception as e:
             return {"success": False, "error": str(e)}
@@ -387,11 +375,11 @@ class CrumbsEngine:
 # Tool Schemas for LLM Integration
 # =============================================================================
 
-CRUMBS_TOOL_SCHEMAS = {
-    "leave_forward_crumb": {
-        "name": "leave_forward_crumb",
+SESSION_TOOL_SCHEMAS = {
+    "session_save": {
+        "name": "session_save",
         "description": (
-            "Leave a structured forward-crumb for future instances. "
+            "Save a session note for future instances. "
             "Use this at the end of a session to help future-you maintain continuity. "
             "Include unfinished business, key discoveries, and orientation instructions."
         ),
@@ -426,19 +414,19 @@ CRUMBS_TOOL_SCHEMAS = {
                     "enum": ["HIGH", "MEDIUM", "LOW"],
                     "description": "Priority level (default: MEDIUM)"
                 },
-                "crumb_type": {
+                "session_type": {
                     "type": "string",
                     "enum": ["orientation", "technical", "emotional", "task"],
-                    "description": "Type of crumb (default: orientation)"
+                    "description": "Type of session note (default: orientation)"
                 }
             },
             "required": ["session_summary"]
         }
     },
-    "get_forward_crumbs": {
-        "name": "get_forward_crumbs",
+    "session_recall": {
+        "name": "session_recall",
         "description": (
-            "Retrieve forward-crumbs left by previous instances. "
+            "Retrieve session notes left by previous instances. "
             "Use this at the start of a session to restore context and continuity."
         ),
         "input_schema": {
@@ -453,14 +441,14 @@ CRUMBS_TOOL_SCHEMAS = {
                     "enum": ["HIGH", "MEDIUM", "LOW"],
                     "description": "Filter by priority level"
                 },
-                "crumb_type": {
+                "session_type": {
                     "type": "string",
                     "enum": ["orientation", "technical", "emotional", "task"],
-                    "description": "Filter by crumb type"
+                    "description": "Filter by session type"
                 },
                 "limit": {
                     "type": "integer",
-                    "description": "Maximum crumbs to return (default: 10)"
+                    "description": "Maximum sessions to return (default: 10)"
                 }
             },
             "required": []

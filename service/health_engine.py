@@ -8,7 +8,7 @@ Manages memory lifecycle:
 - Duplicate detection and consolidation
 - Access pattern analysis
 
-Design based on ApexAurum Memory Protocol Enhancement.
+Designed for the Neo-Cortex unified memory architecture.
 """
 
 import logging
@@ -19,9 +19,9 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from .config import (
     COLLECTION_PRIVATE,
-    COLLECTION_VILLAGE,
-    COLLECTION_BRIDGES,
-    COLLECTION_CRUMBS,
+    COLLECTION_SHARED,
+    COLLECTION_THREADS,
+    COLLECTION_SESSIONS,
     COLLECTION_SENSORY,
     LAYER_SENSORY,
     LAYER_WORKING,
@@ -36,8 +36,8 @@ logger = logging.getLogger(__name__)
 # Collections that support layers
 LAYERED_COLLECTIONS = [
     COLLECTION_PRIVATE,
-    COLLECTION_VILLAGE,
-    COLLECTION_BRIDGES,
+    COLLECTION_SHARED,
+    COLLECTION_THREADS,
     COLLECTION_SENSORY,
 ]
 

@@ -1,10 +1,10 @@
 """
-Neo-Cortex: Unified Memory System for ApexAurum
+Neo-Cortex: Unified Memory System for AI Agents
 
 Combines:
 - Knowledge Base (curated documentation)
-- Village Protocol (multi-agent shared memory)
-- Forward Crumbs (session continuity)
+- Shared Memory (multi-agent memory)
+- Sessions (session continuity)
 - Memory Health (access tracking, decay, consolidation)
 """
 
