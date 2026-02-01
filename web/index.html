@@ -271,6 +271,10 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 3C7 8 7 16 12 21"/><path d="M12 3c5 5 5 13 0 18"/><line x1="3" y1="12" x2="21" y2="12"/></svg>
                     Memory
                 </li>
+                <li class="nav-item" data-tab="knowledge" onclick="switchTab('knowledge')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                    Knowledge
+                </li>
                 <li class="nav-item" data-tab="sessions" onclick="switchTab('sessions')">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><polyline points="12,7 12,12 15,15"/></svg>
                     Sessions
@@ -356,6 +360,63 @@
                         </select>
                         <input type="text" id="store-tags" placeholder="Tags (comma-separated)">
                         <button class="btn btn-gold" onclick="storeMemory()">Store</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Knowledge Tab -->
+            <section class="tab" id="tab-knowledge">
+                <h2 class="tab-title">Knowledge Base</h2>
+                <div class="stats-grid" id="kb-stats"></div>
+                <div class="card">
+                    <h3>Topics</h3>
+                    <div id="kb-topics"></div>
+                </div>
+                <div class="card">
+                    <h3>Knowledge Search</h3>
+                    <div class="search-row">
+                        <input type="text" id="kb-query" placeholder="Search knowledge base..." onkeydown="if(event.key==='Enter')searchKb()">
+                        <button class="btn btn-gold" onclick="searchKb()">Search</button>
+                    </div>
+                    <div class="filter-row">
+                        <select id="kb-topic-filter"><option value="">All Topics</option></select>
+                        <select id="kb-n">
+                            <option value="10">10 results</option>
+                            <option value="25">25</option>
+                            <option value="50">50</option>
+                        </select>
+                    </div>
+                    <div id="kb-results" style="margin-top:0.75rem"></div>
+                </div>
+                <div class="card" id="kb-browser" style="display:none">
+                    <h3>Topic: <span id="kb-browse-name"></span>
+                        <button class="btn btn-outline btn-sm" style="margin-left:0.5rem" onclick="closeKbBrowse()">Back</button>
+                        <button class="btn btn-outline btn-sm" style="margin-left:0.25rem;color:var(--danger);border-color:var(--danger)" onclick="deleteKbTopic()">Delete Topic</button>
+                    </h3>
+                    <div id="kb-browse-chunks"></div>
+                </div>
+                <div class="card">
+                    <h3>Upload Document</h3>
+                    <div id="kb-dropzone" style="border:2px dashed var(--border);border-radius:var(--radius);padding:2rem;text-align:center;color:var(--text-muted);cursor:pointer;transition:border-color 0.15s"
+                         onclick="document.getElementById('kb-file').click()">
+                        <div style="font-size:1.5rem;margin-bottom:0.5rem">&#128196;</div>
+                        Drop a .md file here or click to select
+                        <input type="file" id="kb-file" accept=".md,.txt,.markdown" style="display:none" onchange="kbFileSelected(event)">
+                    </div>
+                    <div class="form-row" style="margin-top:0.5rem">
+                        <input type="text" id="kb-up-topic" placeholder="Topic (required)">
+                        <input type="text" id="kb-up-title" placeholder="Title (auto-detected)">
+                        <button class="btn btn-gold" id="kb-up-btn" onclick="kbUpload()" disabled>Upload & Ingest</button>
+                    </div>
+                    <div id="kb-up-status" style="margin-top:0.5rem;font-size:0.85rem;color:var(--text-dim)"></div>
+                </div>
+                <div class="card">
+                    <h3>Paste & Ingest</h3>
+                    <textarea id="kb-paste" rows="5" placeholder="Paste markdown content here..."></textarea>
+                    <div class="form-row">
+                        <input type="text" id="kb-paste-topic" placeholder="Topic (required)">
+                        <input type="text" id="kb-paste-title" placeholder="Title (optional)">
+                        <button class="btn btn-gold" onclick="kbIngestText()">Ingest</button>
                     </div>
                 </div>
             </section>
@@ -507,7 +568,7 @@ function switchTab(name) {
     document.getElementById('tab-' + name)?.classList.add('active');
     document.querySelector(`.nav-item[data-tab="${name}"]`)?.classList.add('active');
     closeSidebar();
-    const loaders = { dashboard: loadDashboard, memory: loadMemoryTab, sessions: loadSessions, agents: loadAgents };
+    const loaders = { dashboard: loadDashboard, memory: loadMemoryTab, knowledge: loadKnowledgeTab, sessions: loadSessions, agents: loadAgents };
     if (loaders[name]) loaders[name]();
 }
 
@@ -828,6 +889,172 @@ async function runPromotions() {
         toast(`Promotions: ${d.promoted || 0} promoted`);
     } catch (e) { toast(e.message, true); }
 }
+
+/* ── Knowledge Base ──────────────────────────────────────────── */
+let kbTopics = [];
+let kbFile = null;
+
+async function loadKnowledgeTab() { loadKbStats(); loadKbTopics(); }
+
+async function loadKbStats() {
+    try {
+        const d = await api('/knowledge/stats');
+        document.getElementById('kb-stats').innerHTML = [
+            { v: d.total_chunks || 0, l: 'Chunks' },
+            { v: d.total_topics || 0, l: 'Topics' },
+            { v: d.avg_chunk_size || 0, l: 'Avg Chunk Size' },
+        ].map(i => `<div class="stat-card"><div class="stat-val">${i.v}</div><div class="stat-label">${i.l}</div></div>`).join('');
+    } catch (e) { document.getElementById('kb-stats').innerHTML = empty('Failed to load stats'); }
+}
+
+async function loadKbTopics() {
+    try {
+        const d = await api('/knowledge/topics');
+        kbTopics = d.topics || [];
+        const sel = document.getElementById('kb-topic-filter');
+        sel.innerHTML = '<option value="">All Topics</option>' +
+            kbTopics.map(t => `<option value="${esc(t.name)}">${esc(t.name)} (${t.count})</option>`).join('');
+        const max = Math.max(1, ...kbTopics.map(t => t.count));
+        document.getElementById('kb-topics').innerHTML = kbTopics.length
+            ? kbTopics.map(t =>
+                `<div class="bar-row" style="cursor:pointer" onclick="browseKbTopic('${esc(t.name)}')">
+                    <span class="bar-label">${esc(t.name)}</span>
+                    <div class="bar-track"><div class="bar-fill" style="width:${(t.count/max*100).toFixed(1)}%"></div></div>
+                    <span class="bar-val">${t.count}</span>
+                </div>`).join('')
+            : empty('No topics yet');
+    } catch (e) { document.getElementById('kb-topics').innerHTML = empty('Failed to load topics'); }
+}
+
+async function searchKb() {
+    const q = document.getElementById('kb-query').value.trim();
+    if (!q) return;
+    const el = document.getElementById('kb-results');
+    el.innerHTML = loading();
+    const topic = document.getElementById('kb-topic-filter').value;
+    const n = document.getElementById('kb-n').value;
+    let url = `/knowledge/search?q=${encodeURIComponent(q)}&n=${n}`;
+    if (topic) url += `&topic=${encodeURIComponent(topic)}`;
+    try {
+        const d = await api(url);
+        const r = d.results || [];
+        if (!r.length) { el.innerHTML = empty('No results'); return; }
+        el.innerHTML = r.map(renderKbResult).join('');
+    } catch (e) { el.innerHTML = empty('Search failed'); toast(e.message, true); }
+}
+
+function renderKbResult(r) {
+    const tags = (r.tags || []).map(t => `<span class="badge badge-dim">${esc(t)}</span>`).join('');
+    const sim = r.similarity != null ? `<span class="similarity" style="color:${simColor(r.similarity)}">${(r.similarity*100).toFixed(0)}%</span>` : '';
+    return `<div class="mem-card">
+        <div class="mem-header"><span class="badge badge-gold">KB</span>${sim}</div>
+        <div class="mem-content">${esc((r.content || '').slice(0, 500))}</div>
+        ${tags ? `<div class="mem-meta">${tags}</div>` : ''}
+    </div>`;
+}
+
+async function browseKbTopic(topic) {
+    document.getElementById('kb-browser').style.display = '';
+    document.getElementById('kb-browse-name').textContent = topic;
+    document.getElementById('kb-browse-name').dataset.topic = topic;
+    const el = document.getElementById('kb-browse-chunks');
+    el.innerHTML = loading();
+    try {
+        const d = await api(`/knowledge/search?q=${encodeURIComponent(topic)}&topic=${encodeURIComponent(topic)}&n=50`);
+        const r = d.results || [];
+        el.innerHTML = r.length ? r.map(renderKbResult).join('') : empty('No chunks');
+    } catch (e) { el.innerHTML = empty('Failed'); toast(e.message, true); }
+}
+
+function closeKbBrowse() { document.getElementById('kb-browser').style.display = 'none'; }
+
+async function deleteKbTopic() {
+    const topic = document.getElementById('kb-browse-name').dataset.topic;
+    if (!topic || !confirm(`Delete all chunks for "${topic}"? This cannot be undone.`)) return;
+    try {
+        const res = await fetch(`${API}/knowledge/topic/${encodeURIComponent(topic)}`, { method: 'DELETE' });
+        const d = await res.json();
+        if (!res.ok) throw new Error(d.detail || 'Delete failed');
+        toast(`Deleted ${d.deleted} chunks from "${topic}"`);
+        closeKbBrowse();
+        loadKbTopics();
+        loadKbStats();
+    } catch (e) { toast(e.message, true); }
+}
+
+function kbFileSelected(event) {
+    const f = event.target.files[0];
+    if (!f) return;
+    kbFile = f;
+    document.getElementById('kb-dropzone').style.borderColor = 'var(--gold)';
+    document.getElementById('kb-dropzone').innerHTML =
+        `<div style="font-size:1.5rem;margin-bottom:0.5rem">&#9989;</div>${esc(f.name)} (${(f.size/1024).toFixed(1)} KB)`;
+    document.getElementById('kb-up-btn').disabled = false;
+    if (!document.getElementById('kb-up-topic').value) {
+        document.getElementById('kb-up-topic').value = f.name.replace(/\.md$|\.txt$/i, '').replace(/[-_]/g, '-').toLowerCase();
+    }
+}
+
+async function kbUpload() {
+    if (!kbFile) { toast('Select a file first', true); return; }
+    const topic = document.getElementById('kb-up-topic').value.trim();
+    if (!topic) { toast('Topic is required', true); return; }
+    const status = document.getElementById('kb-up-status');
+    status.innerHTML = loading() + ' Ingesting...';
+    const fd = new FormData();
+    fd.append('file', kbFile);
+    fd.append('topic', topic);
+    const title = document.getElementById('kb-up-title').value.trim();
+    if (title) fd.append('title', title);
+    try {
+        const res = await fetch(`${API}/knowledge/ingest`, { method: 'POST', body: fd });
+        const d = await res.json();
+        if (!res.ok) throw new Error(d.detail || 'Upload failed');
+        status.innerHTML = `<span style="color:var(--success)">Ingested "${esc(d.title)}" into ${esc(d.topic)} &mdash; ${d.chunks} chunks</span>`;
+        toast(`Ingested ${d.chunks} chunks`);
+        kbFile = null;
+        document.getElementById('kb-file').value = '';
+        document.getElementById('kb-up-btn').disabled = true;
+        document.getElementById('kb-dropzone').style.borderColor = 'var(--border)';
+        document.getElementById('kb-dropzone').innerHTML = '<div style="font-size:1.5rem;margin-bottom:0.5rem">&#128196;</div>Drop a .md file here or click to select';
+        loadKbTopics(); loadKbStats();
+    } catch (e) { status.innerHTML = `<span style="color:var(--danger)">${esc(e.message)}</span>`; toast(e.message, true); }
+}
+
+async function kbIngestText() {
+    const content = document.getElementById('kb-paste').value.trim();
+    const topic = document.getElementById('kb-paste-topic').value.trim();
+    if (!content) { toast('Content is required', true); return; }
+    if (!topic) { toast('Topic is required', true); return; }
+    const title = document.getElementById('kb-paste-title').value.trim() || undefined;
+    try {
+        const d = await api('/knowledge/ingest-text', { method: 'POST', body: JSON.stringify({ content, topic, title }) });
+        toast(`Ingested ${d.chunks} chunks into "${d.topic}"`);
+        document.getElementById('kb-paste').value = '';
+        document.getElementById('kb-paste-title').value = '';
+        loadKbTopics(); loadKbStats();
+    } catch (e) { toast(e.message, true); }
+}
+
+// Drag-and-drop setup
+document.addEventListener('DOMContentLoaded', () => {
+    const dz = document.getElementById('kb-dropzone');
+    if (!dz) return;
+    dz.addEventListener('dragover', e => { e.preventDefault(); dz.style.borderColor = 'var(--gold)'; });
+    dz.addEventListener('dragleave', () => { if (!kbFile) dz.style.borderColor = 'var(--border)'; });
+    dz.addEventListener('drop', e => {
+        e.preventDefault();
+        const f = e.dataTransfer.files[0];
+        if (f) {
+            kbFile = f;
+            dz.innerHTML = `<div style="font-size:1.5rem;margin-bottom:0.5rem">&#9989;</div>${esc(f.name)} (${(f.size/1024).toFixed(1)} KB)`;
+            document.getElementById('kb-up-btn').disabled = false;
+            dz.style.borderColor = 'var(--gold)';
+            if (!document.getElementById('kb-up-topic').value)
+                document.getElementById('kb-up-topic').value = f.name.replace(/\.md$|\.txt$/i,'').replace(/[-_]/g,'-').toLowerCase();
+        }
+    });
+});
 
 /* ── Init ────────────────────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', () => {

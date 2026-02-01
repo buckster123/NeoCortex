@@ -53,7 +53,7 @@ import logging
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from fastapi import FastAPI, Query, HTTPException, Body
+from fastapi import FastAPI, Query, HTTPException, Body, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -61,7 +61,7 @@ from pydantic import BaseModel, Field
 
 from service.cortex_engine import get_engine, CortexEngine
 from service.storage.base import MemoryCore
-from service.config import ALL_COLLECTIONS
+from service.config import ALL_COLLECTIONS, COLLECTION_KNOWLEDGE
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("cortex-api")
@@ -162,6 +162,12 @@ class ImportRequest(BaseModel):
     re_embed: bool = Field(True, description="Regenerate embeddings")
 
 
+class IngestTextRequest(BaseModel):
+    content: str = Field(..., description="Raw text/markdown content to ingest")
+    topic: str = Field(..., description="Topic name for categorization")
+    title: str = Field("Untitled", description="Document title")
+
+
 # ============================================================================
 # Core Endpoints
 # ============================================================================
@@ -177,6 +183,7 @@ async def root():
             "stats": "/stats",
             "health": "/health",
             "memory": "/memory/*",
+            "knowledge": "/knowledge/*",
             "agents": "/agents",
             "sessions": "/sessions/*",
             "export": "/export",
@@ -460,6 +467,153 @@ async def import_memories(request: ImportRequest):
         return {"success": True, "imported": stats}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# Knowledge Endpoints
+# ============================================================================
+
+@app.get("/knowledge/search", tags=["Knowledge"])
+async def knowledge_search(
+    q: str = Query(..., description="Search query"),
+    topic: Optional[str] = Query(None, description="Filter by topic"),
+    n: int = Query(10, ge=1, le=50, description="Max results"),
+):
+    """Search the knowledge base with optional topic filter."""
+    cortex = get_cortex()
+    fetch_n = n * 3 if topic else n
+    result = cortex.search(
+        query=q,
+        collections=[COLLECTION_KNOWLEDGE],
+        n_results=min(fetch_n, 50),
+    )
+    if not result.get("success"):
+        raise HTTPException(status_code=500, detail=result.get("error", "Search failed"))
+    results = result.get("results", [])
+    if topic:
+        results = [r for r in results if r.get("tags") and len(r["tags"]) > 0 and r["tags"][0] == topic]
+    return {"success": True, "query": q, "topic": topic, "count": len(results[:n]), "results": results[:n]}
+
+
+@app.get("/knowledge/topics", tags=["Knowledge"])
+async def knowledge_topics():
+    """List all knowledge topics with chunk counts."""
+    cortex = get_cortex()
+    records = cortex.storage.list_all(COLLECTION_KNOWLEDGE)
+    topic_counts = {}
+    for r in records:
+        if r.tags and len(r.tags) > 0:
+            topic_counts[r.tags[0]] = topic_counts.get(r.tags[0], 0) + 1
+    topics = [{"name": t, "count": c} for t, c in sorted(topic_counts.items(), key=lambda x: -x[1])]
+    return {"success": True, "topics": topics, "total_topics": len(topics)}
+
+
+@app.get("/knowledge/stats", tags=["Knowledge"])
+async def knowledge_stats():
+    """Get knowledge base statistics."""
+    cortex = get_cortex()
+    records = cortex.storage.list_all(COLLECTION_KNOWLEDGE)
+    topic_counts = {}
+    total_chars = 0
+    for r in records:
+        total_chars += len(r.content)
+        if r.tags and len(r.tags) > 0:
+            topic_counts[r.tags[0]] = topic_counts.get(r.tags[0], 0) + 1
+    total = len(records)
+    return {
+        "success": True,
+        "total_chunks": total,
+        "total_topics": len(topic_counts),
+        "avg_chunk_size": total_chars // max(total, 1),
+        "total_chars": total_chars,
+        "top_topics": sorted(topic_counts.items(), key=lambda x: -x[1])[:10],
+    }
+
+
+@app.post("/knowledge/ingest", tags=["Knowledge"])
+async def knowledge_ingest_file(
+    file: UploadFile = File(...),
+    topic: str = Form(...),
+    title: Optional[str] = Form(None),
+):
+    """Upload a markdown file to ingest into the knowledge base."""
+    from service.ingest import extract_title, chunk_by_sections, make_chunk_id
+    from service.storage.base import MemoryRecord
+
+    cortex = get_cortex()
+    content = await file.read()
+    try:
+        text = content.decode("utf-8")
+    except UnicodeDecodeError:
+        raise HTTPException(status_code=400, detail="File must be UTF-8 text")
+    if len(text) > 500_000:
+        raise HTTPException(status_code=400, detail="File too large (max 500KB)")
+    if not text.strip():
+        raise HTTPException(status_code=400, detail="File is empty")
+
+    doc_title = title or extract_title(text, Path(file.filename or "upload"))
+    source = file.filename or "upload.md"
+    sections = chunk_by_sections(text)
+    if not sections:
+        raise HTTPException(status_code=400, detail="No content sections found")
+
+    records = []
+    for i, (heading, chunk_text) in enumerate(sections):
+        chunk_id = make_chunk_id(source, heading, i, chunk_text)
+        full_content = f"[{topic}/{doc_title}] {heading}\n\n{chunk_text}"
+        records.append(MemoryRecord(
+            id=chunk_id, content=full_content, agent_id="SYSTEM",
+            visibility="shared", layer="cortex", message_type="fact",
+            tags=[topic, doc_title.lower().replace(" ", "-")],
+            created_at=datetime.now(), attention_weight=1.0,
+        ))
+
+    cortex.storage.add(COLLECTION_KNOWLEDGE, records)
+    return {"success": True, "chunks": len(records), "topic": topic, "title": doc_title, "source": source}
+
+
+@app.post("/knowledge/ingest-text", tags=["Knowledge"])
+async def knowledge_ingest_text(request: IngestTextRequest):
+    """Ingest raw text/markdown content into the knowledge base."""
+    from service.ingest import extract_title, chunk_by_sections, make_chunk_id
+    from service.storage.base import MemoryRecord
+
+    cortex = get_cortex()
+    text = request.content.strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Content is empty")
+
+    doc_title = request.title if request.title != "Untitled" else extract_title(text, Path("paste"))
+    source = f"paste_{doc_title.lower().replace(' ', '-')}"
+    sections = chunk_by_sections(text)
+    if not sections:
+        raise HTTPException(status_code=400, detail="No content sections found")
+
+    records = []
+    for i, (heading, chunk_text) in enumerate(sections):
+        chunk_id = make_chunk_id(source, heading, i, chunk_text)
+        full_content = f"[{request.topic}/{doc_title}] {heading}\n\n{chunk_text}"
+        records.append(MemoryRecord(
+            id=chunk_id, content=full_content, agent_id="SYSTEM",
+            visibility="shared", layer="cortex", message_type="fact",
+            tags=[request.topic, doc_title.lower().replace(" ", "-")],
+            created_at=datetime.now(), attention_weight=1.0,
+        ))
+
+    cortex.storage.add(COLLECTION_KNOWLEDGE, records)
+    return {"success": True, "chunks": len(records), "topic": request.topic, "title": doc_title}
+
+
+@app.delete("/knowledge/topic/{topic}", tags=["Knowledge"])
+async def knowledge_delete_topic(topic: str):
+    """Delete all knowledge chunks for a topic."""
+    cortex = get_cortex()
+    records = cortex.storage.list_all(COLLECTION_KNOWLEDGE)
+    ids_to_delete = [r.id for r in records if r.tags and len(r.tags) > 0 and r.tags[0] == topic]
+    if not ids_to_delete:
+        raise HTTPException(status_code=404, detail=f"No chunks found for topic: {topic}")
+    cortex.storage.delete(COLLECTION_KNOWLEDGE, ids_to_delete)
+    return {"success": True, "topic": topic, "deleted": len(ids_to_delete)}
 
 
 # ============================================================================
