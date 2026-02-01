@@ -55,7 +55,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from fastapi import FastAPI, Query, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from service.cortex_engine import get_engine, CortexEngine
@@ -171,6 +172,7 @@ async def root():
         "name": "Neo-Cortex Memory API",
         "version": "1.0.0",
         "docs": "/docs",
+        "ui": "/ui",
         "endpoints": {
             "stats": "/stats",
             "health": "/health",
@@ -491,13 +493,31 @@ async def quick_remember(
 
 
 # ============================================================================
+# Web UI
+# ============================================================================
+
+WEB_DIR = Path(__file__).parent.parent / "web"
+
+
+@app.get("/ui", include_in_schema=False)
+async def serve_ui():
+    """Serve the web dashboard."""
+    return FileResponse(WEB_DIR / "index.html")
+
+
+# Mount static files after all API routes
+app.mount("/web", StaticFiles(directory=str(WEB_DIR)), name="web")
+
+
+# ============================================================================
 # Main
 # ============================================================================
 
 def main():
     import uvicorn
     logger.info(f"Starting Neo-Cortex API server on {API_HOST}:{API_PORT}")
-    logger.info(f"Docs: http://localhost:{API_PORT}/docs")
+    logger.info(f"Dashboard: http://localhost:{API_PORT}/ui")
+    logger.info(f"API Docs:  http://localhost:{API_PORT}/docs")
     try:
         cortex = get_cortex()
         s = cortex.stats()

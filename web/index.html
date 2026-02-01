@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neo-Cortex | Memory Dashboard</title>
+    <style>
+        :root {
+            --bg-deep: #0a0a1a;
+            --bg: #0f0f1a;
+            --surface: #1a1a2e;
+            --surface-2: #222240;
+            --surface-3: #2a2a4a;
+            --gold: #FFD700;
+            --gold-bright: #FFE44D;
+            --gold-dim: #B8960B;
+            --amber: #FFA500;
+            --gold-glow: rgba(255, 215, 0, 0.12);
+            --gold-border: rgba(255, 215, 0, 0.25);
+            --text: #e8e8f0;
+            --text-dim: #8888aa;
+            --text-muted: #555570;
+            --success: #4ade80;
+            --warning: #fbbf24;
+            --danger: #f87171;
+            --info: #60a5fa;
+            --border: #2a2a50;
+            --shadow: 0 4px 24px rgba(0,0,0,0.4);
+            --radius: 12px;
+            --radius-sm: 8px;
+            --sidebar-w: 220px;
+            --header-h: 56px;
+            --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            --mono: 'Fira Code', Consolas, Monaco, monospace;
+        }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: var(--font); background: var(--bg-deep); color: var(--text); min-height: 100vh; line-height: 1.6; }
+        .app { min-height: 100vh; }
+
+        /* Sidebar */
+        .sidebar {
+            background: var(--bg);
+            border-right: 1px solid var(--border);
+            display: flex; flex-direction: column;
+            position: fixed; width: var(--sidebar-w); height: 100vh; z-index: 100;
+        }
+        .sidebar-header {
+            padding: 1.25rem 1rem 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+        .logo {
+            font-size: 1.2rem; font-weight: 700; color: var(--gold);
+            letter-spacing: 0.5px;
+        }
+        .logo-sub { font-size: 0.7rem; color: var(--text-muted); display: block; margin-top: 2px; }
+        .nav { list-style: none; padding: 0.5rem 0; flex: 1; }
+        .nav-item {
+            display: flex; align-items: center; gap: 0.6rem;
+            padding: 0.6rem 1rem; margin: 2px 0.5rem; border-radius: var(--radius-sm);
+            cursor: pointer; color: var(--text-dim); font-size: 0.85rem;
+            transition: all 0.15s ease; border-left: 3px solid transparent;
+        }
+        .nav-item:hover { background: var(--surface); color: var(--text); }
+        .nav-item.active {
+            background: var(--gold-glow); color: var(--gold);
+            border-left-color: var(--gold);
+        }
+        .nav-item svg { width: 18px; height: 18px; flex-shrink: 0; }
+        .sidebar-footer {
+            padding: 0.75rem 1rem; border-top: 1px solid var(--border);
+            display: flex; align-items: center; gap: 0.5rem; font-size: 0.75rem; color: var(--text-muted);
+        }
+        .health-dot {
+            width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted);
+            flex-shrink: 0;
+        }
+        .health-dot.ok { background: var(--success); box-shadow: 0 0 6px var(--success); animation: pulse 2s infinite; }
+        .health-dot.warn { background: var(--warning); box-shadow: 0 0 6px var(--warning); }
+        .health-dot.err { background: var(--danger); box-shadow: 0 0 6px var(--danger); }
+        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+        /* Main content */
+        .main { margin-left: var(--sidebar-w); padding: 1.5rem 2rem 2rem; min-height: 100vh; }
+        .mobile-header { display: none; }
+
+        /* Tab content */
+        .tab { display: none; }
+        .tab.active { display: block; }
+        .tab-title { font-size: 1.4rem; font-weight: 600; color: var(--gold); margin-bottom: 1.25rem; }
+
+        /* Cards */
+        .card {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1rem;
+        }
+        .card.accent { border-top: 2px solid var(--gold); }
+        .card h3 { font-size: 0.95rem; color: var(--gold); margin-bottom: 0.75rem; }
+
+        /* Stat cards grid */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.75rem; margin-bottom: 1.25rem; }
+        .stat-card {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: var(--radius); padding: 1rem; text-align: center;
+            border-top: 2px solid var(--gold-border);
+        }
+        .stat-val { font-size: 1.8rem; font-weight: 700; color: var(--gold); line-height: 1.2; }
+        .stat-label { font-size: 0.75rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 0.25rem; }
+
+        /* Bar chart */
+        .bar-row { display: flex; align-items: center; margin-bottom: 0.5rem; gap: 0.75rem; }
+        .bar-label { width: 120px; font-size: 0.78rem; color: var(--text-dim); text-align: right; flex-shrink: 0; }
+        .bar-track { flex: 1; height: 20px; background: var(--bg-deep); border-radius: 4px; overflow: hidden; }
+        .bar-fill { height: 100%; background: linear-gradient(90deg, var(--gold-dim), var(--gold)); border-radius: 4px; transition: width 0.5s ease; min-width: 2px; }
+        .bar-val { width: 50px; font-size: 0.78rem; color: var(--text); font-family: var(--mono); }
+
+        /* Forms */
+        input[type="text"], input[type="number"], input[type="color"], textarea, select {
+            background: var(--bg-deep); border: 1px solid var(--border); border-radius: var(--radius-sm);
+            color: var(--text); padding: 0.5rem 0.75rem; font-size: 0.85rem; font-family: var(--font);
+            outline: none; transition: border-color 0.15s;
+        }
+        input:focus, textarea:focus, select:focus { border-color: var(--gold-border); }
+        textarea { resize: vertical; width: 100%; }
+        select { cursor: pointer; }
+        .form-row { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem; }
+        .form-row > * { flex: 1; min-width: 120px; }
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.5rem; margin-bottom: 0.5rem; }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;
+            padding: 0.5rem 1rem; border: none; border-radius: var(--radius-sm);
+            font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.15s;
+            font-family: var(--font);
+        }
+        .btn-gold {
+            background: linear-gradient(135deg, var(--gold), var(--amber));
+            color: #1a1a2e;
+        }
+        .btn-gold:hover { filter: brightness(1.1); transform: translateY(-1px); }
+        .btn-outline {
+            background: transparent; border: 1px solid var(--border); color: var(--text-dim);
+        }
+        .btn-outline:hover { border-color: var(--gold-border); color: var(--gold); }
+        .btn-sm { padding: 0.35rem 0.7rem; font-size: 0.78rem; }
+
+        /* Search */
+        .search-row { display: flex; gap: 0.5rem; }
+        .search-row input { flex: 1; }
+        .filter-row { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem; }
+        .filter-row > * { min-width: 100px; }
+
+        /* Badges */
+        .badge {
+            display: inline-block; padding: 0.15rem 0.5rem; border-radius: 10px;
+            font-size: 0.7rem; font-weight: 600; letter-spacing: 0.3px;
+        }
+        .badge-gold { background: var(--gold-glow); color: var(--gold); border: 1px solid var(--gold-border); }
+        .badge-green { background: rgba(74,222,128,0.12); color: var(--success); }
+        .badge-amber { background: rgba(251,191,36,0.12); color: var(--warning); }
+        .badge-red { background: rgba(248,113,113,0.12); color: var(--danger); }
+        .badge-blue { background: rgba(96,165,250,0.12); color: var(--info); }
+        .badge-dim { background: var(--surface-2); color: var(--text-dim); }
+
+        /* Memory results */
+        .mem-card {
+            background: var(--surface); border: 1px solid var(--border);
+            border-left: 3px solid var(--gold-dim); border-radius: var(--radius);
+            padding: 1rem; margin-bottom: 0.75rem;
+        }
+        .mem-header { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+        .mem-content { font-size: 0.88rem; color: var(--text); line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+        .mem-meta { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.5rem; }
+        .similarity { font-family: var(--mono); font-size: 0.75rem; }
+
+        /* Session cards */
+        .sess-card {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: var(--radius); padding: 1rem; margin-bottom: 0.75rem;
+        }
+        .sess-card h4 { font-size: 0.88rem; color: var(--text); margin-bottom: 0.5rem; }
+        .sess-body { font-size: 0.85rem; color: var(--text-dim); line-height: 1.6; white-space: pre-wrap; }
+        .sess-body.collapsed { max-height: 100px; overflow: hidden; position: relative; }
+        .sess-body.collapsed::after {
+            content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 40px;
+            background: linear-gradient(transparent, var(--surface));
+        }
+
+        /* Agent cards */
+        .agent-card {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: var(--radius); padding: 1rem; display: flex; align-items: center; gap: 1rem;
+            margin-bottom: 0.75rem;
+        }
+        .agent-symbol {
+            width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center;
+            justify-content: center; font-size: 1.3rem; border: 2px solid var(--border);
+            flex-shrink: 0;
+        }
+        .agent-info h4 { font-size: 0.95rem; color: var(--text); }
+        .agent-info p { font-size: 0.8rem; color: var(--text-dim); }
+
+        /* Health */
+        .health-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.75rem; margin-bottom: 1rem; }
+        .rec-item { padding: 0.5rem 0; font-size: 0.85rem; color: var(--text-dim); border-bottom: 1px solid var(--border); }
+
+        /* Toast */
+        .toast-container { position: fixed; top: 1rem; right: 1rem; z-index: 9999; display: flex; flex-direction: column; gap: 0.5rem; }
+        .toast {
+            background: var(--surface); border: 1px solid var(--gold-border); border-radius: var(--radius-sm);
+            padding: 0.75rem 1rem; font-size: 0.85rem; color: var(--text);
+            box-shadow: var(--shadow); animation: slideIn 0.2s ease;
+            max-width: 350px;
+        }
+        .toast.error { border-color: var(--danger); }
+        @keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+
+        /* Loading */
+        .spinner {
+            width: 24px; height: 24px; border: 2px solid var(--border); border-top-color: var(--gold);
+            border-radius: 50%; animation: spin 0.6s linear infinite; margin: 1rem auto;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Empty state */
+        .empty { text-align: center; padding: 2rem; color: var(--text-muted); font-size: 0.9rem; }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .app { grid-template-columns: 1fr; }
+            .sidebar { transform: translateX(-100%); transition: transform 0.2s; }
+            .sidebar.open { transform: translateX(0); }
+            .main { margin-left: 0; padding: 1rem; }
+            .mobile-header {
+                display: flex; align-items: center; gap: 0.75rem;
+                padding: 0.75rem 0; margin-bottom: 1rem; border-bottom: 1px solid var(--border);
+            }
+            .hamburger {
+                background: none; border: none; color: var(--gold); font-size: 1.5rem; cursor: pointer;
+                padding: 0.25rem;
+            }
+            .mobile-header h1 { font-size: 1.1rem; color: var(--gold); }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+            .bar-label { width: 80px; font-size: 0.7rem; }
+        }
+
+        /* Overlay for mobile sidebar */
+        .overlay {
+            display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 99;
+        }
+        .overlay.show { display: block; }
+    </style>
+</head>
+<body>
+    <div class="toast-container" id="toasts"></div>
+    <div class="overlay" id="overlay" onclick="closeSidebar()"></div>
+
+    <div class="app">
+        <!-- Sidebar -->
+        <nav class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">Neo-Cortex</div>
+                <span class="logo-sub">Memory Dashboard</span>
+            </div>
+            <ul class="nav">
+                <li class="nav-item active" data-tab="dashboard" onclick="switchTab('dashboard')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                    Dashboard
+                </li>
+                <li class="nav-item" data-tab="memory" onclick="switchTab('memory')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 3C7 8 7 16 12 21"/><path d="M12 3c5 5 5 13 0 18"/><line x1="3" y1="12" x2="21" y2="12"/></svg>
+                    Memory
+                </li>
+                <li class="nav-item" data-tab="sessions" onclick="switchTab('sessions')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><polyline points="12,7 12,12 15,15"/></svg>
+                    Sessions
+                </li>
+                <li class="nav-item" data-tab="agents" onclick="switchTab('agents')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    Agents
+                </li>
+                <li class="nav-item" data-tab="health" onclick="switchTab('health')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                    Health
+                </li>
+            </ul>
+            <div class="sidebar-footer">
+                <div class="health-dot" id="health-dot"></div>
+                <span id="footer-info">loading...</span>
+            </div>
+        </nav>
+
+        <!-- Main -->
+        <main class="main">
+            <div class="mobile-header">
+                <button class="hamburger" onclick="openSidebar()">&#9776;</button>
+                <h1>Neo-Cortex</h1>
+            </div>
+
+            <!-- Dashboard Tab -->
+            <section class="tab active" id="tab-dashboard">
+                <h2 class="tab-title">Dashboard</h2>
+                <div class="stats-grid" id="stats-grid"></div>
+                <div class="card">
+                    <h3>Collections</h3>
+                    <div id="collections-chart"></div>
+                </div>
+                <div class="card">
+                    <h3>Quick Search</h3>
+                    <div class="search-row">
+                        <input type="text" id="quick-search" placeholder="Search memories..." onkeydown="if(event.key==='Enter')quickSearch()">
+                        <button class="btn btn-gold" onclick="quickSearch()">Search</button>
+                    </div>
+                    <div id="quick-results" style="margin-top:0.75rem"></div>
+                </div>
+            </section>
+
+            <!-- Memory Tab -->
+            <section class="tab" id="tab-memory">
+                <h2 class="tab-title">Memory Explorer</h2>
+                <div class="card">
+                    <div class="search-row">
+                        <input type="text" id="mem-query" placeholder="Search shared memory..." onkeydown="if(event.key==='Enter')searchMemory()">
+                        <button class="btn btn-gold" onclick="searchMemory()">Search</button>
+                    </div>
+                    <div class="filter-row">
+                        <select id="mem-vis">
+                            <option value="shared">Shared</option>
+                            <option value="private">Private</option>
+                            <option value="all">All</option>
+                        </select>
+                        <select id="mem-agent"><option value="">All Agents</option></select>
+                        <select id="mem-n">
+                            <option value="10">10 results</option>
+                            <option value="25">25</option>
+                            <option value="50">50</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="mem-results"></div>
+                <div class="card" style="margin-top:0.5rem">
+                    <h3>Store New Memory</h3>
+                    <textarea id="store-content" rows="3" placeholder="Memory content..."></textarea>
+                    <div class="form-row">
+                        <select id="store-vis">
+                            <option value="shared">Shared</option>
+                            <option value="private">Private</option>
+                            <option value="thread">Thread</option>
+                        </select>
+                        <select id="store-type">
+                            <option value="observation">Observation</option>
+                            <option value="fact">Fact</option>
+                            <option value="dialogue">Dialogue</option>
+                            <option value="discovery">Discovery</option>
+                            <option value="question">Question</option>
+                        </select>
+                        <input type="text" id="store-tags" placeholder="Tags (comma-separated)">
+                        <button class="btn btn-gold" onclick="storeMemory()">Store</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Sessions Tab -->
+            <section class="tab" id="tab-sessions">
+                <h2 class="tab-title">Sessions</h2>
+                <div class="card">
+                    <div class="filter-row">
+                        <select id="sess-priority">
+                            <option value="">All Priorities</option>
+                            <option value="HIGH">HIGH</option>
+                            <option value="MEDIUM">MEDIUM</option>
+                            <option value="LOW">LOW</option>
+                        </select>
+                        <select id="sess-type">
+                            <option value="">All Types</option>
+                            <option value="orientation">Orientation</option>
+                            <option value="technical">Technical</option>
+                            <option value="task">Task</option>
+                        </select>
+                        <select id="sess-hours">
+                            <option value="24">Last 24h</option>
+                            <option value="168" selected>Last Week</option>
+                            <option value="720">Last Month</option>
+                        </select>
+                        <button class="btn btn-gold btn-sm" onclick="loadSessions()">Load</button>
+                    </div>
+                </div>
+                <div id="tasks-card" class="card accent" style="display:none">
+                    <h3>Unfinished Tasks</h3>
+                    <ul id="tasks-list" style="padding-left:1.25rem;color:var(--text-dim);font-size:0.85rem"></ul>
+                </div>
+                <div id="sess-list"></div>
+            </section>
+
+            <!-- Agents Tab -->
+            <section class="tab" id="tab-agents">
+                <h2 class="tab-title">Agents</h2>
+                <div id="agents-list"></div>
+                <div class="card" style="margin-top:0.5rem">
+                    <h3>Register New Agent</h3>
+                    <div class="form-grid">
+                        <input type="text" id="ag-id" placeholder="Agent ID (e.g. RESEARCHER)">
+                        <input type="text" id="ag-name" placeholder="Display Name">
+                        <input type="text" id="ag-lineage" placeholder="Lineage">
+                        <input type="text" id="ag-spec" placeholder="Specialization">
+                        <input type="number" id="ag-gen" value="0" placeholder="Generation">
+                        <input type="color" id="ag-color" value="#FFD700">
+                    </div>
+                    <textarea id="ag-story" rows="2" placeholder="Origin story (optional)" style="margin-bottom:0.5rem"></textarea>
+                    <button class="btn btn-gold" onclick="registerAgent()">Register Agent</button>
+                </div>
+            </section>
+
+            <!-- Health Tab -->
+            <section class="tab" id="tab-health">
+                <h2 class="tab-title">Memory Health</h2>
+                <div style="margin-bottom:1rem">
+                    <button class="btn btn-gold" onclick="loadHealth()">Run Health Report</button>
+                </div>
+                <div id="health-report"></div>
+                <div class="card" style="margin-top:0.5rem">
+                    <h3>Collection Inspector</h3>
+                    <div class="filter-row">
+                        <select id="health-coll">
+                            <option value="cortex_shared">cortex_shared</option>
+                            <option value="cortex_private">cortex_private</option>
+                            <option value="cortex_threads">cortex_threads</option>
+                            <option value="cortex_sessions">cortex_sessions</option>
+                            <option value="cortex_knowledge">cortex_knowledge</option>
+                            <option value="cortex_sensory">cortex_sensory</option>
+                        </select>
+                        <button class="btn btn-outline btn-sm" onclick="loadStale()">Stale</button>
+                        <button class="btn btn-outline btn-sm" onclick="loadDuplicates()">Duplicates</button>
+                        <button class="btn btn-outline btn-sm" onclick="runPromotions()">Promote</button>
+                    </div>
+                </div>
+                <div id="health-details"></div>
+            </section>
+        </main>
+    </div>
+
+<script>
+/* ── Config & State ──────────────────────────────────────────── */
+const API = window.location.origin;
+let state = { agents: [] };
+
+/* ── API Helper ──────────────────────────────────────────────── */
+async function api(path, opts = {}) {
+    const res = await fetch(`${API}${path}`, {
+        headers: { 'Content-Type': 'application/json' },
+        ...opts,
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+    return data;
+}
+
+/* ── Utilities ───────────────────────────────────────────────── */
+function esc(s) {
+    if (!s) return '';
+    const d = document.createElement('div');
+    d.textContent = String(s);
+    return d.innerHTML;
+}
+
+function timeAgo(iso) {
+    if (!iso) return '';
+    const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+    if (s < 60) return 'just now';
+    if (s < 3600) return Math.floor(s/60) + 'm ago';
+    if (s < 86400) return Math.floor(s/3600) + 'h ago';
+    return Math.floor(s/86400) + 'd ago';
+}
+
+function simColor(v) {
+    if (v >= 0.7) return 'var(--gold)';
+    if (v >= 0.4) return 'var(--amber)';
+    return 'var(--text-muted)';
+}
+
+function priBadge(p) {
+    const m = { HIGH: 'badge-red', MEDIUM: 'badge-amber', LOW: 'badge-green' };
+    return `<span class="badge ${m[p]||'badge-dim'}">${esc(p)}</span>`;
+}
+
+function visBadge(v) {
+    const m = { shared: 'badge-gold', private: 'badge-blue', thread: 'badge-dim' };
+    return `<span class="badge ${m[v]||'badge-dim'}">${esc(v)}</span>`;
+}
+
+function toast(msg, err) {
+    const c = document.getElementById('toasts');
+    const t = document.createElement('div');
+    t.className = 'toast' + (err ? ' error' : '');
+    t.textContent = msg;
+    c.appendChild(t);
+    setTimeout(() => t.remove(), 3500);
+}
+
+function loading() { return '<div class="spinner"></div>'; }
+function empty(msg) { return `<div class="empty">${esc(msg)}</div>`; }
+
+/* ── Navigation ──────────────────────────────────────────────── */
+function switchTab(name) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.getElementById('tab-' + name)?.classList.add('active');
+    document.querySelector(`.nav-item[data-tab="${name}"]`)?.classList.add('active');
+    closeSidebar();
+    const loaders = { dashboard: loadDashboard, memory: loadMemoryTab, sessions: loadSessions, agents: loadAgents };
+    if (loaders[name]) loaders[name]();
+}
+
+function openSidebar() { document.getElementById('sidebar').classList.add('open'); document.getElementById('overlay').classList.add('show'); }
+function closeSidebar() { document.getElementById('sidebar').classList.remove('open'); document.getElementById('overlay').classList.remove('show'); }
+
+/* ── Dashboard ───────────────────────────────────────────────── */
+async function loadDashboard() {
+    try {
+        const [stats, health] = await Promise.all([api('/stats'), api('/health').catch(() => null)]);
+        renderStats(stats);
+        renderChart(stats.collections || {});
+        if (health) {
+            const dot = document.getElementById('health-dot');
+            dot.className = 'health-dot ' + (health.status === 'healthy' ? 'ok' : 'warn');
+            document.getElementById('footer-info').textContent =
+                `${health.backend} | ${health.total_memories} memories`;
+        }
+    } catch (e) {
+        document.getElementById('stats-grid').innerHTML = empty('Failed to load stats');
+        document.getElementById('health-dot').className = 'health-dot err';
+    }
+}
+
+function renderStats(s) {
+    const items = [
+        { v: s.total_memories || 0, l: 'Total Memories' },
+        { v: s.registered_agents || 0, l: 'Agents' },
+        { v: Object.keys(s.collections || {}).length, l: 'Collections' },
+        { v: (s.sessions?.total_sessions || 0), l: 'Sessions' },
+    ];
+    document.getElementById('stats-grid').innerHTML = items.map(i =>
+        `<div class="stat-card"><div class="stat-val">${i.v}</div><div class="stat-label">${i.l}</div></div>`
+    ).join('');
+}
+
+function renderChart(colls) {
+    const max = Math.max(1, ...Object.values(colls));
+    document.getElementById('collections-chart').innerHTML = Object.entries(colls).map(([k, v]) =>
+        `<div class="bar-row">
+            <span class="bar-label">${esc(k.replace('cortex_',''))}</span>
+            <div class="bar-track"><div class="bar-fill" style="width:${(v/max*100).toFixed(1)}%"></div></div>
+            <span class="bar-val">${v}</span>
+        </div>`
+    ).join('');
+}
+
+async function quickSearch() {
+    const q = document.getElementById('quick-search').value.trim();
+    if (!q) return;
+    const el = document.getElementById('quick-results');
+    el.innerHTML = loading();
+    try {
+        const d = await api(`/q/${encodeURIComponent(q)}`);
+        if (!d.results?.length) { el.innerHTML = empty('No results'); return; }
+        el.innerHTML = d.results.map(r =>
+            `<div class="mem-card">
+                <div class="mem-header"><span class="badge badge-gold">${esc(r.agent)}</span>
+                <span class="similarity" style="color:${simColor(r.similarity)}">${(r.similarity*100).toFixed(0)}%</span></div>
+                <div class="mem-content">${esc(r.content)}</div>
+            </div>`
+        ).join('');
+    } catch (e) { el.innerHTML = empty('Search failed'); toast(e.message, true); }
+}
+
+/* ── Memory Explorer ─────────────────────────────────────────── */
+function loadMemoryTab() {
+    if (!state.agents.length) loadAgentFilter();
+}
+
+async function loadAgentFilter() {
+    try {
+        const d = await api('/agents');
+        state.agents = d.agents || [];
+        const sel = document.getElementById('mem-agent');
+        sel.innerHTML = '<option value="">All Agents</option>' +
+            state.agents.map(a => `<option value="${esc(a.id)}">${esc(a.id)}</option>`).join('');
+    } catch {}
+}
+
+async function searchMemory() {
+    const q = document.getElementById('mem-query').value.trim();
+    if (!q) return;
+    const el = document.getElementById('mem-results');
+    el.innerHTML = loading();
+    const vis = document.getElementById('mem-vis').value;
+    const agent = document.getElementById('mem-agent').value;
+    const n = document.getElementById('mem-n').value;
+    let url = `/memory/search?q=${encodeURIComponent(q)}&visibility=${vis}&n=${n}`;
+    if (agent) url += `&agent=${encodeURIComponent(agent)}`;
+    try {
+        const d = await api(url);
+        const msgs = d.messages || [];
+        if (!msgs.length) { el.innerHTML = empty('No memories found'); return; }
+        el.innerHTML = msgs.map(renderMemCard).join('');
+    } catch (e) { el.innerHTML = empty('Search failed'); toast(e.message, true); }
+}
+
+function renderMemCard(m) {
+    const tags = (m.tags || []).map(t => `<span class="badge badge-dim">${esc(t)}</span>`).join('');
+    return `<div class="mem-card">
+        <div class="mem-header">
+            <span class="badge badge-gold">${esc(m.agent_id)}</span>
+            ${visBadge(m.visibility)}
+            <span class="badge badge-dim">${esc(m.message_type || '')}</span>
+            <span class="similarity" style="color:${simColor(m.similarity)}">${(m.similarity*100).toFixed(0)}%</span>
+            <span style="margin-left:auto;font-size:0.72rem;color:var(--text-muted)">${timeAgo(m.posted_at)}</span>
+        </div>
+        <div class="mem-content">${esc(m.content)}</div>
+        ${tags ? `<div class="mem-meta">${tags}</div>` : ''}
+    </div>`;
+}
+
+async function storeMemory() {
+    const content = document.getElementById('store-content').value.trim();
+    if (!content) return;
+    const tags = document.getElementById('store-tags').value.split(',').map(t => t.trim()).filter(Boolean);
+    try {
+        await api('/memory/store', { method: 'POST', body: JSON.stringify({
+            content,
+            visibility: document.getElementById('store-vis').value,
+            message_type: document.getElementById('store-type').value,
+            tags,
+        })});
+        toast('Memory stored');
+        document.getElementById('store-content').value = '';
+        document.getElementById('store-tags').value = '';
+    } catch (e) { toast(e.message, true); }
+}
+
+/* ── Sessions ────────────────────────────────────────────────── */
+async function loadSessions() {
+    const el = document.getElementById('sess-list');
+    el.innerHTML = loading();
+    const p = document.getElementById('sess-priority').value;
+    const t = document.getElementById('sess-type').value;
+    const h = document.getElementById('sess-hours').value;
+    let url = `/sessions?limit=20&hours=${h}`;
+    if (p) url += `&priority=${p}`;
+    if (t) url += `&session_type=${t}`;
+    try {
+        const [d, tasks] = await Promise.all([api(url), api('/sessions/tasks').catch(() => ({tasks:[]}))]);
+        // Unfinished tasks
+        const tc = document.getElementById('tasks-card');
+        const tl = document.getElementById('tasks-list');
+        if (tasks.tasks?.length) {
+            tc.style.display = '';
+            tl.innerHTML = tasks.tasks.map(t => `<li>${esc(t)}</li>`).join('');
+        } else { tc.style.display = 'none'; }
+
+        const sessions = d.sessions || [];
+        if (!sessions.length) { el.innerHTML = empty('No session notes found'); return; }
+        el.innerHTML = sessions.map(renderSession).join('');
+    } catch (e) { el.innerHTML = empty('Failed to load sessions'); toast(e.message, true); }
+}
+
+function renderSession(s) {
+    const tags = s.tags || [];
+    const priority = tags.find(t => t.startsWith('priority:'))?.split(':')[1] || '';
+    const stype = tags.find(t => t.startsWith('type:'))?.split(':')[1] || '';
+    const id = 'sess-' + Math.random().toString(36).slice(2, 8);
+    return `<div class="sess-card">
+        <div style="display:flex;gap:0.4rem;align-items:center;margin-bottom:0.5rem">
+            ${priority ? priBadge(priority) : ''}
+            ${stype ? `<span class="badge badge-blue">${esc(stype)}</span>` : ''}
+            <span style="margin-left:auto;font-size:0.72rem;color:var(--text-muted)">${esc(s.agent_id)}</span>
+        </div>
+        <div class="sess-body collapsed" id="${id}">${esc(s.content)}</div>
+        <button class="btn btn-outline btn-sm" style="margin-top:0.5rem" onclick="toggleExpand('${id}')">Show More</button>
+    </div>`;
+}
+
+function toggleExpand(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const btn = el.nextElementSibling;
+    if (el.classList.contains('collapsed')) {
+        el.classList.remove('collapsed');
+        btn.textContent = 'Show Less';
+    } else {
+        el.classList.add('collapsed');
+        btn.textContent = 'Show More';
+    }
+}
+
+/* ── Agents ──────────────────────────────────────────────────── */
+async function loadAgents() {
+    const el = document.getElementById('agents-list');
+    el.innerHTML = loading();
+    try {
+        const d = await api('/agents');
+        state.agents = d.agents || [];
+        if (!state.agents.length) { el.innerHTML = empty('No agents registered'); return; }
+        el.innerHTML = state.agents.map(a =>
+            `<div class="agent-card">
+                <div class="agent-symbol" style="border-color:${esc(a.color || '#FFD700')};color:${esc(a.color || '#FFD700')}">${esc(a.symbol || '?')}</div>
+                <div class="agent-info">
+                    <h4>${esc(a.id)} <span style="font-weight:400;color:var(--text-dim);font-size:0.82rem">${esc(a.display_name)}</span></h4>
+                    <p>${esc(a.specialization || '')} &middot; Gen ${a.generation} &middot; ${esc(a.lineage || '')}</p>
+                </div>
+            </div>`
+        ).join('');
+    } catch (e) { el.innerHTML = empty('Failed to load agents'); toast(e.message, true); }
+}
+
+async function registerAgent() {
+    const id = document.getElementById('ag-id').value.trim().toUpperCase();
+    const name = document.getElementById('ag-name').value.trim();
+    if (!id || !name) { toast('Agent ID and name required', true); return; }
+    try {
+        await api('/agents/register', { method: 'POST', body: JSON.stringify({
+            agent_id: id,
+            display_name: name,
+            generation: parseInt(document.getElementById('ag-gen').value) || 0,
+            lineage: document.getElementById('ag-lineage').value.trim() || 'Custom',
+            specialization: document.getElementById('ag-spec').value.trim() || 'General',
+            origin_story: document.getElementById('ag-story').value.trim() || undefined,
+            color: document.getElementById('ag-color').value,
+        })});
+        toast('Agent registered');
+        loadAgents();
+        loadAgentFilter();
+    } catch (e) { toast(e.message, true); }
+}
+
+/* ── Health ───────────────────────────────────────────────────── */
+async function loadHealth() {
+    const el = document.getElementById('health-report');
+    el.innerHTML = loading();
+    try {
+        const d = await api('/memory/health');
+        const sum = d.summary || {};
+        let html = '<div class="health-summary">';
+        html += `<div class="stat-card"><div class="stat-val">${sum.total_memories||0}</div><div class="stat-label">Total</div></div>`;
+        html += `<div class="stat-card"><div class="stat-val" style="color:${sum.total_stale?'var(--warning)':'var(--gold)'}">${sum.total_stale||0}</div><div class="stat-label">Stale</div></div>`;
+        html += `<div class="stat-card"><div class="stat-val">${sum.promotion_candidates||0}</div><div class="stat-label">Promotable</div></div>`;
+        html += '</div>';
+
+        // Per-collection breakdown
+        const colls = d.collections || {};
+        for (const [name, info] of Object.entries(colls)) {
+            html += `<div class="card"><h3>${esc(name.replace('cortex_',''))}</h3>`;
+            html += `<div style="display:flex;gap:1rem;flex-wrap:wrap;font-size:0.82rem;color:var(--text-dim)">`;
+            html += `<span>Total: <strong style="color:var(--text)">${info.total || 0}</strong></span>`;
+            html += `<span>Stale: <strong style="color:${info.stale_count?'var(--warning)':'var(--text)'}">${info.stale_count || 0}</strong></span>`;
+            html += `<span>Promotable: <strong style="color:var(--text)">${info.promotion_candidates || 0}</strong></span>`;
+            html += `</div>`;
+            // Layer bars
+            const layers = info.by_layer || {};
+            const lmax = Math.max(1, ...Object.values(layers));
+            if (Object.keys(layers).length) {
+                html += '<div style="margin-top:0.5rem">';
+                for (const [l, c] of Object.entries(layers)) {
+                    html += `<div class="bar-row"><span class="bar-label">${esc(l)}</span>
+                        <div class="bar-track"><div class="bar-fill" style="width:${(c/lmax*100).toFixed(1)}%"></div></div>
+                        <span class="bar-val">${c}</span></div>`;
+                }
+                html += '</div>';
+            }
+            html += '</div>';
+        }
+
+        // Recommendations
+        if (d.recommendations?.length) {
+            html += '<div class="card"><h3>Recommendations</h3>';
+            html += d.recommendations.map(r => `<div class="rec-item">${esc(r)}</div>`).join('');
+            html += '</div>';
+        }
+        el.innerHTML = html;
+    } catch (e) { el.innerHTML = empty('Failed to load health report'); toast(e.message, true); }
+}
+
+async function loadStale() {
+    const coll = document.getElementById('health-coll').value;
+    const el = document.getElementById('health-details');
+    el.innerHTML = loading();
+    try {
+        const d = await api(`/memory/stale/${coll}?days=30&limit=20`);
+        const items = d.stale_memories || d.memories || [];
+        if (!items.length) { el.innerHTML = empty('No stale memories in ' + coll); return; }
+        el.innerHTML = `<div class="card"><h3>Stale in ${esc(coll.replace('cortex_',''))}</h3>` +
+            items.map(m => `<div class="mem-card"><div class="mem-content">${esc((m.content||'').slice(0,200))}</div></div>`).join('') + '</div>';
+    } catch (e) { el.innerHTML = empty('Failed'); toast(e.message, true); }
+}
+
+async function loadDuplicates() {
+    const coll = document.getElementById('health-coll').value;
+    const el = document.getElementById('health-details');
+    el.innerHTML = loading();
+    try {
+        const d = await api(`/memory/duplicates/${coll}?threshold=0.95&limit=10`);
+        const pairs = d.duplicate_pairs || d.pairs || [];
+        if (!pairs.length) { el.innerHTML = empty('No duplicates in ' + coll); return; }
+        el.innerHTML = `<div class="card"><h3>Duplicates in ${esc(coll.replace('cortex_',''))}</h3>` +
+            pairs.map(p => `<div class="mem-card" style="margin-bottom:1rem">
+                <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.5rem">Similarity: ${((p.similarity||0)*100).toFixed(1)}%</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem">
+                    <div style="font-size:0.82rem">${esc((p.content1||p.memory1||'').slice(0,150))}</div>
+                    <div style="font-size:0.82rem">${esc((p.content2||p.memory2||'').slice(0,150))}</div>
+                </div>
+                <button class="btn btn-outline btn-sm" style="margin-top:0.5rem" onclick="consolidate('${esc(coll)}','${esc(p.id1||'')}','${esc(p.id2||'')}')">Consolidate</button>
+            </div>`).join('') + '</div>';
+    } catch (e) { el.innerHTML = empty('Failed'); toast(e.message, true); }
+}
+
+async function consolidate(coll, id1, id2) {
+    try {
+        await api('/memory/consolidate', { method: 'POST', body: JSON.stringify({ collection: coll, id1, id2 }) });
+        toast('Consolidated');
+        loadDuplicates();
+    } catch (e) { toast(e.message, true); }
+}
+
+async function runPromotions() {
+    const coll = document.getElementById('health-coll').value;
+    try {
+        const d = await api(`/memory/promote/${coll}`, { method: 'POST' });
+        toast(`Promotions: ${d.promoted || 0} promoted`);
+    } catch (e) { toast(e.message, true); }
+}
+
+/* ── Init ────────────────────────────────────────────────────── */
+document.addEventListener('DOMContentLoaded', () => {
+    loadDashboard();
+});
+</script>
+</body>
+</html>
