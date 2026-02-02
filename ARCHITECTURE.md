@@ -31,6 +31,7 @@ neo-cortex/
 │   ├── shared_engine.py      # Shared Memory subsystem
 │   ├── session_engine.py     # Session Continuity subsystem
 │   ├── health_engine.py      # Memory health subsystem
+│   ├── ingest.py             # Knowledge ingestion pipeline
 │   │
 │   ├── layers.py             # Memory layer management
 │   ├── attention.py          # Access tracking & decay
@@ -42,10 +43,11 @@ neo-cortex/
 │   └── api_server.py         # FastAPI REST server
 │
 ├── data/
-│   └── chroma/               # ChromaDB persistence
+│   ├── chroma/               # ChromaDB persistence
+│   └── raw_docs/             # Markdown source docs for ingestion
 │
 └── web/
-    └── index.html            # Web UI
+    └── index.html            # Web dashboard (6 tabs)
 ```
 
 ## Collections Schema
@@ -255,12 +257,13 @@ Additional agents can be registered at runtime via `register_agent()`.
 - [ ] Stale/duplicate detection
 
 ### Phase 5: API Layer
-- [ ] MCP server
-- [ ] REST API
-- [ ] Web UI
+- [x] MCP server (16 tools + resources + prompts)
+- [x] REST API (FastAPI on port 8766)
+- [x] Web dashboard (6 tabs: Dashboard, Memory, Knowledge, Sessions, Agents, Health)
+- [x] Knowledge management endpoints (search, topics, stats, ingest file, ingest text, delete topic)
 
 ### Phase 6: Cloud Backend
-- [ ] pgvector adapter
+- [x] pgvector adapter
 - [ ] Integration with cloud/backend/
 
 ---

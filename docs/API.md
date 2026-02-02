@@ -287,6 +287,132 @@ Get unfinished tasks from sessions.
 
 ---
 
+## Knowledge Endpoints
+
+### GET /knowledge/search
+Search the knowledge base with optional topic filter.
+
+**Query Parameters:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| q | string | required | Search query |
+| topic | string | null | Filter by topic name |
+| n | int | 10 | Max results (1-50) |
+
+**Example:**
+```
+GET /knowledge/search?q=dependency%20injection&topic=fastapi&n=5
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "query": "dependency injection",
+  "topic": "fastapi",
+  "count": 5,
+  "results": [
+    {
+      "id": "kb_3ad0c4a274a3d6ec",
+      "content": "[fastapi/FastAPI Complete Guide] Basic Dependency...",
+      "tags": ["fastapi", "fastapi-complete-guide"],
+      "similarity": 0.59,
+      "collection": "cortex_knowledge"
+    }
+  ]
+}
+```
+
+### GET /knowledge/topics
+List all knowledge topics with chunk counts.
+
+**Response:**
+```json
+{
+  "success": true,
+  "topics": [
+    {"name": "anthropic", "count": 377},
+    {"name": "dev-tools", "count": 141},
+    {"name": "fastapi", "count": 35}
+  ],
+  "total_topics": 20
+}
+```
+
+### GET /knowledge/stats
+Get knowledge base statistics.
+
+**Response:**
+```json
+{
+  "success": true,
+  "total_chunks": 920,
+  "total_topics": 20,
+  "avg_chunk_size": 427,
+  "total_chars": 392878,
+  "top_topics": [["anthropic", 377], ["dev-tools", 141]]
+}
+```
+
+### POST /knowledge/ingest
+Upload a markdown file to ingest into the knowledge base.
+
+**Content-Type:** `multipart/form-data`
+
+**Form Fields:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| file | file | yes | Markdown file (.md, .txt) |
+| topic | string | yes | Topic name for categorization |
+| title | string | no | Document title (auto-detected from H1 if omitted) |
+
+**Response:**
+```json
+{
+  "success": true,
+  "chunks": 12,
+  "topic": "my-topic",
+  "title": "My Document",
+  "source": "my-document.md"
+}
+```
+
+### POST /knowledge/ingest-text
+Ingest raw text/markdown content.
+
+**Request Body:**
+```json
+{
+  "content": "# My Document\n\n## Section 1\n\nContent here...",
+  "topic": "my-topic",
+  "title": "My Document"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "chunks": 3,
+  "topic": "my-topic",
+  "title": "My Document"
+}
+```
+
+### DELETE /knowledge/topic/{topic}
+Delete all knowledge chunks for a topic.
+
+**Response:**
+```json
+{
+  "success": true,
+  "topic": "my-topic",
+  "deleted": 12
+}
+```
+
+---
+
 ## Memory Health Endpoints
 
 ### GET /memory/health

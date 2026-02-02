@@ -71,12 +71,14 @@ AI agents forget everything between sessions. They can't share knowledge with ot
 
 ### Key Features
 
+- **Knowledge Base** - Ingest markdown docs, search 920+ chunks across 20+ topics
 - **Shared Memory** - Multi-agent memory with private, shared, and thread realms
 - **Session Continuity** - Leave session notes for your future self across sessions
 - **Memory Health** - Automatic decay, promotion, and deduplication
 - **Convergence Detection** - Know when multiple agents agree (HARMONY/CONSENSUS)
+- **Web Dashboard** - Visual UI for browsing knowledge, memory, sessions, agents, and health
 - **Dual Backend** - ChromaDB for local, pgvector for cloud deployments
-- **Multiple Interfaces** - CLI, MCP Server, REST API, Python SDK
+- **Multiple Interfaces** - CLI, MCP Server, REST API, Python SDK, Web Dashboard
 
 ---
 
@@ -215,7 +217,9 @@ Add to your `~/.claude.json`:
 }
 ```
 
-Then in Claude Code, you'll have access to 16 memory tools!
+Then in Claude Code, you'll have access to 16 memory tools.
+
+See [INTEGRATE.md](INTEGRATE.md) for a complete guide on adding neo-cortex session continuity to any project.
 
 ### REST API
 
@@ -227,7 +231,8 @@ Then in Claude Code, you'll have access to 16 memory tools!
 uvicorn service.api_server:app --host 0.0.0.0 --port 8766
 ```
 
-OpenAPI docs at `http://localhost:8766/docs`
+- OpenAPI docs at `http://localhost:8766/docs`
+- Web dashboard at `http://localhost:8766/ui`
 
 #### Endpoints
 
@@ -237,6 +242,12 @@ OpenAPI docs at `http://localhost:8766/docs`
 | POST | `/memory/store` | Store a memory |
 | GET | `/memory/search?q=...` | Search memories |
 | POST | `/memory/convergence` | Detect convergence |
+| GET | `/knowledge/search?q=...` | Search knowledge base |
+| GET | `/knowledge/topics` | List topics with counts |
+| GET | `/knowledge/stats` | Knowledge base stats |
+| POST | `/knowledge/ingest` | Upload & ingest markdown file |
+| POST | `/knowledge/ingest-text` | Ingest raw text content |
+| DELETE | `/knowledge/topic/{topic}` | Delete a topic |
 | GET | `/agents` | List agents |
 | POST | `/agents/register` | Register new agent |
 | POST | `/sessions/save` | Save session note |
@@ -357,10 +368,10 @@ cortex.memory_store("Hello from my agent!", visibility="shared")
 │  └────┬────┘  └────┬────┘  └────┬────┘  └──────────┬──────────┘ │
 ├───────┴────────────┴───────────┴───────────────────┴────────────┤
 │                      CORTEX ENGINE                               │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │
-│  │   Shared    │  │   Session   │  │    Memory Health        │  │
-│  │   Memory    │  │   Engine    │  │    Engine               │  │
-│  └─────────────┘  └─────────────┘  └─────────────────────────┘  │
+│  ┌───────────┐ ┌───────────┐ ┌───────────┐ ┌─────────────────┐  │
+│  │ Knowledge │ │  Shared   │ │  Session  │ │  Memory Health  │  │
+│  │  Engine   │ │  Memory   │ │  Engine   │ │     Engine      │  │
+│  └───────────┘ └───────────┘ └───────────┘ └─────────────────┘  │
 ├─────────────────────────────────────────────────────────────────┤
 │                      STORAGE ADAPTER                             │
 │            ┌───────────────┐    ┌───────────────┐               │
